@@ -1,0 +1,122 @@
+# BGAmble — Deployment Guide
+
+---
+
+## Step-by-step: Deploy to Polygon Amoy Testnet
+
+### 1. Create a deployer wallet
+
+Use MetaMask or any wallet to create a **dedicated deployer wallet**. Export its private key.
+
+### 2. Get test POL (gas token)
+
+You need testnet POL to pay for gas on Amoy:
+- Go to the [Polygon Amoy Faucet](https://faucet.polygon.technology/) and request test POL for your deployer address.
+
+### 3. Fill in your `.env` file
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env`:
+
+```env
+# Private key of your deployer wallet (with or without 0x prefix)
+DEPLOYER_PRIVATE_KEY=your_private_key_here
+
+# Amoy testnet USDC (Circle's official test token)
+USDC_ADDRESS=0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582
+
+# Your 4 oracle wallet addresses
+ORACLE_1=0x...
+ORACLE_2=0x...
+ORACLE_3=0x...
+ORACLE_4=0x...
+
+# Optional: for contract verification on Polygonscan
+POLYGONSCAN_API_KEY=your_key_here
+```
+
+### 4. Deploy
+
+```bash
+npm run deploy:testnet
+```
+
+This runs `hardhat run scripts/deploy.js --network amoy`, which will:
+1. Compile the contract
+2. Deploy it to Amoy
+3. Wait 30 seconds, then attempt to verify it on Polygonscan
+
+You'll see output like:
+```
+Deploying BGAmble...
+  Network : amoy
+  Token   : 0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582
+  Oracles : 0x... 0x... 0x...
+
+✅ BGAmble deployed to: 0xYOUR_CONTRACT_ADDRESS
+```
+
+---
+
+## Step-by-step: Deploy to Polygon Mainnet (later)
+
+### 1. Fund deployer with real POL
+
+Buy POL and send it to your deployer wallet address. A few dollars worth is enough for deployment gas.
+
+### 2. Update `.env` for mainnet
+
+```env
+# Switch to mainnet USDC
+USDC_ADDRESS=0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
+
+# Use your real oracle addresses (can be the same or different)
+ORACLE_1=0x...
+ORACLE_2=0x...
+ORACLE_3=0x...
+ORACLE_4=0x...
+```
+
+
+### 3. Deploy
+
+```bash
+npm run deploy:mainnet
+```
+
+---
+
+## Contract Verification (Polygonscan)
+
+The deploy script auto-verifies if `POLYGONSCAN_API_KEY` is set. To get a key:
+
+1. Create a free account at [polygonscan.com/register](https://polygonscan.com/register)
+2. Generate an API key at [polygonscan.com/myapikey](https://polygonscan.com/myapikey)
+
+If auto-verification fails, you can retry manually:
+
+```bash
+npx hardhat verify --network amoy CONTRACT_ADDRESS \
+  "0xTOKEN_ADDRESS" \
+  "[0xORACLE1,0xORACLE2,0xORACLE3,0xORACLE4]"
+```
+
+---
+
+## Quick Reference
+
+| Command | What it does |
+|---|---|
+| `npm run compile` | Compile the contract |
+| `npm run test` | Run tests (when you add them) |
+| `npm run deploy:testnet` | Deploy to Polygon Amoy |
+| `npm run deploy:mainnet` | Deploy to Polygon mainnet |
+
+| Network | Chain ID | Gas Token | USDC Address |
+|---|---|---|---|
+| Amoy (testnet) | 80002 | test POL | `0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582` |
+| Polygon (mainnet) | 137 | POL | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
+
