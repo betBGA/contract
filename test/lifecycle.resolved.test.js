@@ -1,14 +1,10 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, TEN_USDC, ORACLE_FEE } from "./helpers.js";
-
-function asBigInt(v) {
-  return BigInt(v.toString());
-}
+import { deployFixture, TEN_POL, POL, GAS_MARGIN, oracleFee } from "./helpers.js";
 
 describe("Bet lifecycle - Resolved", () => {
   it("4 players, everyone picks own id, oracles resolve in favour of player 1", async () => {
-    const { ethers, bgamble, usdc, oracle1, oracle2, oracle3, alice, bob, carol, dave } =
+    const { ethers, bgamble, oracle1, oracle2, oracle3, alice, bob, carol, dave } =
       await deployFixture();
 
     const wA = 1;
@@ -18,25 +14,24 @@ describe("Bet lifecycle - Resolved", () => {
 
     const betId = 1;
 
-    await bgamble.connect(alice).create(1, TEN_USDC, 4, wA);
-    await bgamble.connect(bob).join(betId, wB);
-    await bgamble.connect(carol).join(betId, wC);
-    await bgamble.connect(dave).join(betId, wD);
+    await bgamble.connect(alice).create(1, TEN_POL, 4, wA, { value: TEN_POL * POL });
+    await bgamble.connect(bob).join(betId, wB, { value: TEN_POL * POL });
+    await bgamble.connect(carol).join(betId, wC, { value: TEN_POL * POL });
+    await bgamble.connect(dave).join(betId, wD, { value: TEN_POL * POL });
 
     await bgamble.connect(alice).confirm(betId);
     await bgamble.connect(bob).confirm(betId);
     await bgamble.connect(carol).confirm(betId);
     await bgamble.connect(dave).confirm(betId);
 
-    const aliceBefore = asBigInt(await usdc.balanceOf(alice.address));
-    const bobBefore = asBigInt(await usdc.balanceOf(bob.address));
-    const carolBefore = asBigInt(await usdc.balanceOf(carol.address));
-    const daveBefore = asBigInt(await usdc.balanceOf(dave.address));
+    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const bobBefore = await ethers.provider.getBalance(bob.address);
+    const carolBefore = await ethers.provider.getBalance(carol.address);
+    const daveBefore = await ethers.provider.getBalance(dave.address);
 
     const oracleIndex = betId % 4; // same logic as contract
-    const oracleList = [oracle1, oracle2, oracle3]; // oracle4 unused for reporting here
     const feeRecipient = [oracle1, oracle2, oracle3, oracle1][oracleIndex]; // betId=1 → oracle[1]
-    const oracleBefore = asBigInt(await usdc.balanceOf(feeRecipient.address));
+    const oracleBefore = await ethers.provider.getBalance(feeRecipient.address);
 
     await bgamble.connect(oracle1).reportResult(betId, [wA]);
     await bgamble.connect(oracle2).reportResult(betId, [wA]);
@@ -45,28 +40,33 @@ describe("Bet lifecycle - Resolved", () => {
     const bet = await bgamble.bets(betId);
     expect(bet.state).to.equal(3n); // Resolved
 
-    const aliceAfter = asBigInt(await usdc.balanceOf(alice.address));
-    const bobAfter = asBigInt(await usdc.balanceOf(bob.address));
-    const carolAfter = asBigInt(await usdc.balanceOf(carol.address));
-    const daveAfter = asBigInt(await usdc.balanceOf(dave.address));
-    const oracleAfter = asBigInt(await usdc.balanceOf(feeRecipient.address));
+    const aliceAfter = await ethers.provider.getBalance(alice.address);
+    const bobAfter = await ethers.provider.getBalance(bob.address);
+    const carolAfter = await ethers.provider.getBalance(carol.address);
+    const daveAfter = await ethers.provider.getBalance(dave.address);
+    const oracleAfter = await ethers.provider.getBalance(feeRecipient.address);
 
-    const prizePool = TEN_USDC * 4n;
-    const payout = prizePool - ORACLE_FEE;
+    const prizePool = TEN_POL * POL * 4n;
+    const fee = oracleFee(prizePool);
+    const payout = prizePool - fee;
 
+    // Alice is the sole winner (non-transacting, exact check)
     expect(aliceAfter - aliceBefore).to.equal(payout);
     expect(bobAfter).to.equal(bobBefore);
     expect(carolAfter).to.equal(carolBefore);
     expect(daveAfter).to.equal(daveBefore);
 
-    expect(oracleAfter - oracleBefore).to.equal(ORACLE_FEE);
+    // Oracle2 (fee recipient) also sent a reportResult tx, so use margin
+    const oracleDelta = oracleAfter - oracleBefore;
+    expect(oracleDelta).to.be.greaterThan(fee - GAS_MARGIN);
+    expect(oracleDelta).to.be.lessThanOrEqual(fee);
 
-    const contractBalance = asBigInt(await usdc.balanceOf(await bgamble.getAddress()));
+    const contractBalance = await ethers.provider.getBalance(await bgamble.getAddress());
     expect(contractBalance).to.equal(0n);
   });
 
   it("4 players, two winners share payout and dust", async () => {
-    const { ethers, bgamble, usdc, oracle1, oracle2, oracle3, alice, bob, carol, dave } =
+    const { ethers, bgamble, oracle1, oracle2, oracle3, alice, bob, carol, dave } =
       await deployFixture();
 
     const wA = 1;
@@ -76,24 +76,24 @@ describe("Bet lifecycle - Resolved", () => {
 
     const betId = 1;
 
-    await bgamble.connect(alice).create(1, TEN_USDC, 4, wA);
-    await bgamble.connect(bob).join(betId, wB);
-    await bgamble.connect(carol).join(betId, wC);
-    await bgamble.connect(dave).join(betId, wD);
+    await bgamble.connect(alice).create(1, TEN_POL, 4, wA, { value: TEN_POL * POL });
+    await bgamble.connect(bob).join(betId, wB, { value: TEN_POL * POL });
+    await bgamble.connect(carol).join(betId, wC, { value: TEN_POL * POL });
+    await bgamble.connect(dave).join(betId, wD, { value: TEN_POL * POL });
 
     await bgamble.connect(alice).confirm(betId);
     await bgamble.connect(bob).confirm(betId);
     await bgamble.connect(carol).confirm(betId);
     await bgamble.connect(dave).confirm(betId);
 
-    const aliceBefore = asBigInt(await usdc.balanceOf(alice.address));
-    const bobBefore = asBigInt(await usdc.balanceOf(bob.address));
-    const carolBefore = asBigInt(await usdc.balanceOf(carol.address));
-    const daveBefore = asBigInt(await usdc.balanceOf(dave.address));
+    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const bobBefore = await ethers.provider.getBalance(bob.address);
+    const carolBefore = await ethers.provider.getBalance(carol.address);
+    const daveBefore = await ethers.provider.getBalance(dave.address);
 
     const oracleIndex = betId % 4;
     const feeRecipient = [oracle1, oracle2, oracle3, oracle1][oracleIndex];
-    const oracleBefore = asBigInt(await usdc.balanceOf(feeRecipient.address));
+    const oracleBefore = await ethers.provider.getBalance(feeRecipient.address);
 
     await bgamble.connect(oracle1).reportResult(betId, [wA, wC]);
     await bgamble.connect(oracle2).reportResult(betId, [wA, wC]);
@@ -102,34 +102,35 @@ describe("Bet lifecycle - Resolved", () => {
     const bet = await bgamble.bets(betId);
     expect(bet.state).to.equal(3n);
 
-    const aliceAfter = asBigInt(await usdc.balanceOf(alice.address));
-    const bobAfter = asBigInt(await usdc.balanceOf(bob.address));
-    const carolAfter = asBigInt(await usdc.balanceOf(carol.address));
-    const daveAfter = asBigInt(await usdc.balanceOf(dave.address));
-    const oracleAfter = asBigInt(await usdc.balanceOf(feeRecipient.address));
+    const aliceAfter = await ethers.provider.getBalance(alice.address);
+    const bobAfter = await ethers.provider.getBalance(bob.address);
+    const carolAfter = await ethers.provider.getBalance(carol.address);
+    const daveAfter = await ethers.provider.getBalance(dave.address);
+    const oracleAfter = await ethers.provider.getBalance(feeRecipient.address);
 
-    const prizePool = TEN_USDC * 4n;
-    const payout = prizePool - ORACLE_FEE;
+    const prizePool = TEN_POL * POL * 4n;
+    const fee = oracleFee(prizePool);
+    const payout = prizePool - fee;
     const share = payout / 2n;
     const remainder = payout % 2n;
 
-    const totalIncreaseAlice = aliceAfter - aliceBefore;
-    const totalIncreaseCarol = carolAfter - carolBefore;
-
     // Alice is first winner, Carol is second and should get the dust
-    expect(totalIncreaseAlice).to.equal(share);
-    expect(totalIncreaseCarol).to.equal(share + remainder);
+    expect(aliceAfter - aliceBefore).to.equal(share);
+    expect(carolAfter - carolBefore).to.equal(share + remainder);
 
     expect(bobAfter).to.equal(bobBefore);
     expect(daveAfter).to.equal(daveBefore);
-    expect(oracleAfter - oracleBefore).to.equal(ORACLE_FEE);
 
-    const contractBalance = asBigInt(await usdc.balanceOf(await bgamble.getAddress()));
+    const oracleDelta = oracleAfter - oracleBefore;
+    expect(oracleDelta).to.be.greaterThan(fee - GAS_MARGIN);
+    expect(oracleDelta).to.be.lessThanOrEqual(fee);
+
+    const contractBalance = await ethers.provider.getBalance(await bgamble.getAddress());
     expect(contractBalance).to.equal(0n);
   });
 
   it("4 players, no one predicted winner so everyone shares payout", async () => {
-    const { ethers, bgamble, usdc, oracle1, oracle2, oracle3, alice, bob, carol, dave } =
+    const { ethers, bgamble, oracle1, oracle2, oracle3, alice, bob, carol, dave } =
       await deployFixture();
 
     const wA = 1;
@@ -139,24 +140,24 @@ describe("Bet lifecycle - Resolved", () => {
 
     const betId = 1;
 
-    await bgamble.connect(alice).create(1, TEN_USDC, 4, wA);
-    await bgamble.connect(bob).join(betId, wB);
-    await bgamble.connect(carol).join(betId, wC);
-    await bgamble.connect(dave).join(betId, wD);
+    await bgamble.connect(alice).create(1, TEN_POL, 4, wA, { value: TEN_POL * POL });
+    await bgamble.connect(bob).join(betId, wB, { value: TEN_POL * POL });
+    await bgamble.connect(carol).join(betId, wC, { value: TEN_POL * POL });
+    await bgamble.connect(dave).join(betId, wD, { value: TEN_POL * POL });
 
     await bgamble.connect(alice).confirm(betId);
     await bgamble.connect(bob).confirm(betId);
     await bgamble.connect(carol).confirm(betId);
     await bgamble.connect(dave).confirm(betId);
 
-    const aliceBefore = asBigInt(await usdc.balanceOf(alice.address));
-    const bobBefore = asBigInt(await usdc.balanceOf(bob.address));
-    const carolBefore = asBigInt(await usdc.balanceOf(carol.address));
-    const daveBefore = asBigInt(await usdc.balanceOf(dave.address));
+    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const bobBefore = await ethers.provider.getBalance(bob.address);
+    const carolBefore = await ethers.provider.getBalance(carol.address);
+    const daveBefore = await ethers.provider.getBalance(dave.address);
 
     const oracleIndex = betId % 4;
     const feeRecipient = [oracle1, oracle2, oracle3, oracle1][oracleIndex];
-    const oracleBefore = asBigInt(await usdc.balanceOf(feeRecipient.address));
+    const oracleBefore = await ethers.provider.getBalance(feeRecipient.address);
 
     const unknownWinner = 999;
 
@@ -167,31 +168,29 @@ describe("Bet lifecycle - Resolved", () => {
     const bet = await bgamble.bets(betId);
     expect(bet.state).to.equal(3n);
 
-    const aliceAfter = asBigInt(await usdc.balanceOf(alice.address));
-    const bobAfter = asBigInt(await usdc.balanceOf(bob.address));
-    const carolAfter = asBigInt(await usdc.balanceOf(carol.address));
-    const daveAfter = asBigInt(await usdc.balanceOf(dave.address));
-    const oracleAfter = asBigInt(await usdc.balanceOf(feeRecipient.address));
+    const aliceAfter = await ethers.provider.getBalance(alice.address);
+    const bobAfter = await ethers.provider.getBalance(bob.address);
+    const carolAfter = await ethers.provider.getBalance(carol.address);
+    const daveAfter = await ethers.provider.getBalance(dave.address);
+    const oracleAfter = await ethers.provider.getBalance(feeRecipient.address);
 
-    const prizePool = TEN_USDC * 4n;
-    const payout = prizePool - ORACLE_FEE;
+    const prizePool = TEN_POL * POL * 4n;
+    const fee = oracleFee(prizePool);
+    const payout = prizePool - fee;
     const share = payout / 4n;
     const remainder = payout % 4n;
 
-    const incA = aliceAfter - aliceBefore;
-    const incB = bobAfter - bobBefore;
-    const incC = carolAfter - carolBefore;
-    const incD = daveAfter - daveBefore;
-
     // Everyone is a winner; last winner in order gets the dust
-    expect(incA).to.equal(share);
-    expect(incB).to.equal(share);
-    expect(incC).to.equal(share);
-    expect(incD).to.equal(share + remainder);
+    expect(aliceAfter - aliceBefore).to.equal(share);
+    expect(bobAfter - bobBefore).to.equal(share);
+    expect(carolAfter - carolBefore).to.equal(share);
+    expect(daveAfter - daveBefore).to.equal(share + remainder);
 
-    expect(oracleAfter - oracleBefore).to.equal(ORACLE_FEE);
+    const oracleDelta = oracleAfter - oracleBefore;
+    expect(oracleDelta).to.be.greaterThan(fee - GAS_MARGIN);
+    expect(oracleDelta).to.be.lessThanOrEqual(fee);
 
-    const contractBalance = asBigInt(await usdc.balanceOf(await bgamble.getAddress()));
+    const contractBalance = await ethers.provider.getBalance(await bgamble.getAddress());
     expect(contractBalance).to.equal(0n);
   });
 });

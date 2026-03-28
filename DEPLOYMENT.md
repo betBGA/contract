@@ -25,9 +25,6 @@ Then edit `.env`:
 # Private key of your deployer wallet (with or without 0x prefix)
 DEPLOYER_PRIVATE_KEY=your_private_key_here
 
-# Amoy testnet USDC (Circle's official test token)
-USDC_ADDRESS=0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582
-
 # Your 4 oracle wallet addresses
 ORACLE_1=0x...
 ORACLE_2=0x...
@@ -53,8 +50,7 @@ You'll see output like:
 ```
 Deploying BGAmble...
   Network : amoy
-  Token   : 0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582
-  Oracles : 0x... 0x... 0x...
+  Oracles : 0x... 0x... 0x... 0x...
 
 ✅ BGAmble deployed to: 0xYOUR_CONTRACT_ADDRESS
 ```
@@ -70,16 +66,12 @@ Buy POL and send it to your deployer wallet address. A few dollars worth is enou
 ### 2. Update `.env` for mainnet
 
 ```env
-# Switch to mainnet USDC
-USDC_ADDRESS=0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
-
 # Use your real oracle addresses (can be the same or different)
 ORACLE_1=0x...
 ORACLE_2=0x...
 ORACLE_3=0x...
 ORACLE_4=0x...
 ```
-
 
 ### 3. Deploy
 
@@ -100,7 +92,6 @@ If auto-verification fails, you can retry manually:
 
 ```bash
 npx hardhat verify --network amoy CONTRACT_ADDRESS \
-  "0xTOKEN_ADDRESS" \
   "[0xORACLE1,0xORACLE2,0xORACLE3,0xORACLE4]"
 ```
 
@@ -111,12 +102,11 @@ npx hardhat verify --network amoy CONTRACT_ADDRESS \
 | Command | What it does |
 |---|---|
 | `npm run compile` | Compile the contract |
-| `npm run test` | Run tests (when you add them) |
+| `npm run test` | Run tests |
 | `npm run deploy:testnet` | Deploy to Polygon Amoy |
 | `npm run deploy:mainnet` | Deploy to Polygon mainnet |
 
-| Network | Chain ID | Gas Token | USDC Address |
-|---|---|---|---|
-| Amoy (testnet) | 80002 | test POL | `0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582` |
-| Polygon (mainnet) | 137 | POL | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
-
+| Network | Chain ID | Native Token |
+|---|---|---|
+| Amoy (testnet) | 80002 | test POL |
+| Polygon (mainnet) | 137 | POL |

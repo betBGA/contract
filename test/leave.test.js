@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, createOpenBetFixture, confirmingBetFixture, lockedBetFixture, TEN_USDC } from "./helpers.js";
+import { deployFixture, createOpenBetFixture, confirmingBetFixture, lockedBetFixture, TEN_POL, POL, GAS_MARGIN } from "./helpers.js";
 
 describe("leave", function () {
   // ── Positive tests ──────────────────────────────────────────────
@@ -11,11 +11,14 @@ describe("leave", function () {
   });
 
   it("should refund the stake to the leaving player", async function () {
-    const { bgamble, usdc, alice } = await createOpenBetFixture();
-    const balanceBefore = await usdc.balanceOf(alice.address);
+    const { bgamble, alice, ethers } = await createOpenBetFixture();
+    const balanceBefore = await ethers.provider.getBalance(alice.address);
     await bgamble.connect(alice).leave(1);
-    const balanceAfter = await usdc.balanceOf(alice.address);
-    expect(balanceAfter - balanceBefore).to.equal(TEN_USDC);
+    const balanceAfter = await ethers.provider.getBalance(alice.address);
+    // Receives refund but pays gas, so net gain is slightly less than TEN_POL * POL
+    const delta = balanceAfter - balanceBefore;
+    expect(delta).to.be.greaterThan(TEN_POL * POL - GAS_MARGIN);
+    expect(delta).to.be.lessThanOrEqual(TEN_POL * POL);
   });
 
   it("should emit BetLeft event", async function () {
@@ -66,14 +69,14 @@ describe("leave", function () {
     const { bgamble, alice, bob, carol, ethers } = await confirmingBetFixture();
     await bgamble.connect(bob).leave(1);
     const w = 3;
-    await expect(bgamble.connect(carol).join(1, w)).to.not.be.revert(ethers);
+    await expect(bgamble.connect(carol).join(1, w, { value: TEN_POL * POL })).to.not.be.revert(ethers);
   });
 
   it("should handle swap-and-pop correctly when first participant leaves", async function () {
     const { bgamble, alice, bob, ethers } = await deployFixture();
     const w = 1;
-    await bgamble.connect(alice).create(1, TEN_USDC, 3, w);
-    await bgamble.connect(bob).join(1, 2);
+    await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
+    await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
     await bgamble.connect(alice).leave(1);
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(1);
@@ -82,9 +85,9 @@ describe("leave", function () {
 
   it("should handle swap-and-pop correctly when middle participant leaves (3 players)", async function () {
     const { bgamble, alice, bob, carol, ethers } = await deployFixture();
-    await bgamble.connect(alice).create(1, TEN_USDC, 3, 1);
-    await bgamble.connect(bob).join(1, 2);
-    await bgamble.connect(carol).join(1, 3);
+    await bgamble.connect(alice).create(1, TEN_POL, 3, 1, { value: TEN_POL * POL });
+    await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
+    await bgamble.connect(carol).join(1, 3, { value: TEN_POL * POL });
     await bgamble.connect(bob).leave(1);
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(2);
@@ -94,9 +97,9 @@ describe("leave", function () {
 
   it("should handle the last participant leaving (3 players)", async function () {
     const { bgamble, alice, bob, carol, ethers } = await deployFixture();
-    await bgamble.connect(alice).create(1, TEN_USDC, 3, 1);
-    await bgamble.connect(bob).join(1, 2);
-    await bgamble.connect(carol).join(1, 3);
+    await bgamble.connect(alice).create(1, TEN_POL, 3, 1, { value: TEN_POL * POL });
+    await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
+    await bgamble.connect(carol).join(1, 3, { value: TEN_POL * POL });
     await bgamble.connect(carol).leave(1);
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(2);

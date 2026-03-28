@@ -6,14 +6,6 @@ async function main() {
   const connection = await hre.network.connect();
   const { ethers } = connection;
 
-  // ── Token addresses ─────────────────────────────────────────────
-  // Amoy testnet USDC (Circle):  0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582
-  // Polygon mainnet USDC:        0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
-  // ────────────────────────────────────────────────────────────────
-
-  const TOKEN_ADDRESS = process.env.USDC_ADDRESS;
-  if (!TOKEN_ADDRESS) throw new Error("Set USDC_ADDRESS in your .env file");
-
   const oracle1 = process.env.ORACLE_1;
   const oracle2 = process.env.ORACLE_2;
   const oracle3 = process.env.ORACLE_3;
@@ -25,11 +17,10 @@ async function main() {
 
   console.log("Deploying BGAmble...");
   console.log("  Network :", networkName);
-  console.log("  Token   :", TOKEN_ADDRESS);
   console.log("  Oracles :", oracle1, oracle2, oracle3, oracle4);
 
   const BGAmble = await ethers.getContractFactory("BGAmble");
-  const constructorArgs = [TOKEN_ADDRESS, [oracle1, oracle2, oracle3, oracle4]];
+  const constructorArgs = [[oracle1, oracle2, oracle3, oracle4]];
   const contract = await BGAmble.deploy(...constructorArgs);
   await contract.waitForDeployment();
 

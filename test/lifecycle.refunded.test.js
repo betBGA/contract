@@ -1,19 +1,15 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { lockedBetFixture, lockedBet3PlayersFixture, TEN_USDC, ONE_DAY, timeTravel } from "./helpers.js";
-
-function asBigInt(v) {
-  return BigInt(v.toString());
-}
+import { lockedBetFixture, lockedBet3PlayersFixture, TEN_POL, POL, GAS_MARGIN, ONE_DAY, timeTravel } from "./helpers.js";
 
 describe("Bet lifecycle - Refunded", () => {
   it("locked bet, refund after 24h+1s returns all stakes", async () => {
-    const { bgamble, usdc, networkHelpers, alice, bob, carol, betId } =
+    const { bgamble, ethers, networkHelpers, alice, bob, carol, betId } =
       await lockedBet3PlayersFixture();
 
-    const aliceBefore = asBigInt(await usdc.balanceOf(alice.address));
-    const bobBefore = asBigInt(await usdc.balanceOf(bob.address));
-    const carolBefore = asBigInt(await usdc.balanceOf(carol.address));
+    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const bobBefore = await ethers.provider.getBalance(bob.address);
+    const carolBefore = await ethers.provider.getBalance(carol.address);
 
     await timeTravel(networkHelpers, ONE_DAY + 1);
 
@@ -22,23 +18,21 @@ describe("Bet lifecycle - Refunded", () => {
     const bet = await bgamble.bets(betId);
     expect(bet.state).to.equal(6n); // Refunded
 
-    const aliceAfter = asBigInt(await usdc.balanceOf(alice.address));
-    const bobAfter = asBigInt(await usdc.balanceOf(bob.address));
-    const carolAfter = asBigInt(await usdc.balanceOf(carol.address));
+    // Alice triggered tx (pays gas), Bob and Carol are passive receivers
+    const aliceDelta = await ethers.provider.getBalance(alice.address) - aliceBefore;
+    expect(aliceDelta).to.be.greaterThan(TEN_POL * POL - GAS_MARGIN);
+    expect(await ethers.provider.getBalance(bob.address) - bobBefore).to.equal(TEN_POL * POL);
+    expect(await ethers.provider.getBalance(carol.address) - carolBefore).to.equal(TEN_POL * POL);
 
-    expect(aliceAfter - aliceBefore).to.equal(TEN_USDC);
-    expect(bobAfter - bobBefore).to.equal(TEN_USDC);
-    expect(carolAfter - carolBefore).to.equal(TEN_USDC);
-
-    const contractBalance = asBigInt(await usdc.balanceOf(await bgamble.getAddress()));
+    const contractBalance = await ethers.provider.getBalance(await bgamble.getAddress());
     expect(contractBalance).to.equal(0n);
   });
 
   it("2-player locked bet, refund well after 24h returns both stakes", async () => {
-    const { bgamble, usdc, networkHelpers, alice, bob, betId } = await lockedBetFixture();
+    const { bgamble, ethers, networkHelpers, alice, bob, betId } = await lockedBetFixture();
 
-    const aliceBefore = asBigInt(await usdc.balanceOf(alice.address));
-    const bobBefore = asBigInt(await usdc.balanceOf(bob.address));
+    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const bobBefore = await ethers.provider.getBalance(bob.address);
 
     await timeTravel(networkHelpers, ONE_DAY * 7 + 1);
 
@@ -47,13 +41,12 @@ describe("Bet lifecycle - Refunded", () => {
     const bet = await bgamble.bets(betId);
     expect(bet.state).to.equal(6n);
 
-    const aliceAfter = asBigInt(await usdc.balanceOf(alice.address));
-    const bobAfter = asBigInt(await usdc.balanceOf(bob.address));
+    // Bob triggered tx (pays gas), Alice is passive receiver
+    expect(await ethers.provider.getBalance(alice.address) - aliceBefore).to.equal(TEN_POL * POL);
+    const bobDelta = await ethers.provider.getBalance(bob.address) - bobBefore;
+    expect(bobDelta).to.be.greaterThan(TEN_POL * POL - GAS_MARGIN);
 
-    expect(aliceAfter - aliceBefore).to.equal(TEN_USDC);
-    expect(bobAfter - bobBefore).to.equal(TEN_USDC);
-
-    const contractBalance = asBigInt(await usdc.balanceOf(await bgamble.getAddress()));
+    const contractBalance = await ethers.provider.getBalance(await bgamble.getAddress());
     expect(contractBalance).to.equal(0n);
   });
 });
