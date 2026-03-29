@@ -31,6 +31,9 @@ ORACLE_2=0x...
 ORACLE_3=0x...
 ORACLE_4=0x...
 
+# Deployed contract address (needed for halt/resume scripts)
+BGAMBLE_ADDRESS=0x...
+
 # Optional: for contract verification on Polygonscan
 POLYGONSCAN_API_KEY=your_key_here
 ```
@@ -45,6 +48,8 @@ This runs `hardhat run scripts/deploy.js --network amoy`, which will:
 1. Compile the contract
 2. Deploy it to Amoy
 3. Wait 30 seconds, then attempt to verify it on Polygonscan
+
+The deployer wallet becomes the **contract owner** — the only address that can call `setAcceptingNewBets()` to halt or resume new bet creation. This is stored as an immutable value and cannot be transferred, so make sure to use the correct wallet.
 
 You'll see output like:
 ```
@@ -97,6 +102,22 @@ npx hardhat verify --network amoy CONTRACT_ADDRESS \
 
 ---
 
+## Halt / Resume New Bet Creation
+
+After deployment, set `BGAMBLE_ADDRESS` in your `.env` to the deployed contract address, then use the convenience scripts to halt or resume new bet creation. The scripts use the `DEPLOYER_PRIVATE_KEY` from `.env` to sign the transaction.
+
+```bash
+# Stop new bets from being created
+npm run halt:testnet    # or halt:mainnet
+
+# Allow new bets again
+npm run resume:testnet  # or resume:mainnet
+```
+
+Existing bets (join, confirm, leave, cancel, resolve, refund) are unaffected by halting.
+
+---
+
 ## Quick Reference
 
 | Command | What it does |
@@ -105,6 +126,10 @@ npx hardhat verify --network amoy CONTRACT_ADDRESS \
 | `npm run test` | Run tests |
 | `npm run deploy:testnet` | Deploy to Polygon Amoy |
 | `npm run deploy:mainnet` | Deploy to Polygon mainnet |
+| `npm run halt:testnet` | Disable new bet creation on Amoy |
+| `npm run halt:mainnet` | Disable new bet creation on mainnet |
+| `npm run resume:testnet` | Re-enable new bet creation on Amoy |
+| `npm run resume:mainnet` | Re-enable new bet creation on mainnet |
 
 | Network | Chain ID | Native Token |
 |---|---|---|

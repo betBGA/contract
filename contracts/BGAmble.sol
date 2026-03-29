@@ -34,6 +34,8 @@ contract BGAmble is ReentrancyGuard {
     error LimitMustBePositive();
     error IncorrectValue();
     error TransferFailed();
+    error NotOwner();
+    error NewBetsDisabled();
 
     // 1 POL in wei (10^18). Used to convert whole-token amounts to wei for
     // msg.value checks and native token transfers.
@@ -48,6 +50,14 @@ contract BGAmble is ReentrancyGuard {
     // Upper bound on the per-participant stake (whole POL tokens). Caps the
     // financial incentive for oracle corruption while still allowing large bets.
     uint64 public constant MAX_BET_AMOUNT = 10_000; // 10,000 POL
+
+    // The address that deployed the contract. Only this address may toggle
+    // acceptingNewBets.
+    address public immutable owner;
+
+    // When false, create() reverts. Existing bets (join, confirm, leave, resolve,
+    // cancel, refund) are unaffected. Defaults to true.
+    bool public acceptingNewBets = true;
 
     // Auto-incrementing bet ID counter. Starts at 1 so that betId 0 is never used,
     // which lets us treat betId == 0 as "does not exist" in storage checks.
@@ -157,6 +167,8 @@ contract BGAmble is ReentrancyGuard {
     // Initialises the contract with exactly 4 unique oracle addresses.
     // These cannot be changed after deployment.
     constructor(address[4] memory _oracles) {
+        owner = msg.sender;
+
         if (_oracles[0] == address(0)) revert InvalidOracleAddress(1);
         if (_oracles[1] == address(0)) revert InvalidOracleAddress(2);
         if (_oracles[2] == address(0)) revert InvalidOracleAddress(3);
@@ -218,6 +230,7 @@ contract BGAmble is ReentrancyGuard {
         uint8 slotCount,
         uint64 predictedWinner
     ) external payable nonReentrant returns (uint32) {
+        if (!acceptingNewBets) revert NewBetsDisabled();
         if (slotCount < 2) revert SlotCountTooLow();
         if (slotCount > 10) revert SlotCountTooHigh();
         if (amount < 10) revert BetAmountTooLow();
@@ -532,6 +545,19 @@ contract BGAmble is ReentrancyGuard {
     function _sendPOL(address to, uint256 weiAmount) internal {
         (bool success, ) = to.call{value: weiAmount}("");
         if (!success) revert TransferFailed();
+    }
+
+    // --- Owner Actions ---
+
+    event AcceptingNewBetsChanged(bool accepting);
+
+    // Allows the contract owner to enable or disable new bet creation.
+    // When set to false, create() will revert. All other actions on existing
+    // bets (join, confirm, leave, resolve, cancel, refund) remain unaffected.
+    function setAcceptingNewBets(bool accepting) external {
+        if (msg.sender != owner) revert NotOwner();
+        acceptingNewBets = accepting;
+        emit AcceptingNewBetsChanged(accepting);
     }
 
     // --- View Functions ---

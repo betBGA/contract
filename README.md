@@ -99,6 +99,12 @@ If oracle consensus is not reached within **24 hours**, any participant can trig
 
 ---
 
+### Emergency halt
+
+The contract owner (deployer) can disable new bet creation at any time by calling `setAcceptingNewBets(false)`. When disabled, `create()` reverts but all other actions on existing bets (join, confirm, leave, cancel, resolve, refund) continue to work normally. This can be re-enabled at any time by calling `setAcceptingNewBets(true)`.
+
+---
+
 ### Stateless frontend support
 
 The design allows a frontend to:
@@ -119,6 +125,7 @@ The smart contract is responsible for:
 * handling cancellation consensus
 * receiving oracle results
 * distributing winnings
+* allowing the owner to halt new bet creation
 
 The contract uses **OpenZeppelin's ReentrancyGuard** to protect against reentrancy attacks on native token transfers.
 
@@ -317,6 +324,8 @@ create(bgaTableId, amount, slotCount, predictedWinner) payable
 
 The creator automatically joins the bet with their predicted winner.
 
+Reverts with `NewBetsDisabled` if the owner has disabled new bet creation.
+
 ---
 
 ## Join Bet
@@ -399,6 +408,24 @@ Rules:
 * 3 matching reports resolve the bet
 * 4 reports with no 3 agreeing trigger no-consensus (funds distributed equally)
 
+
+---
+
+# Owner Actions
+
+The contract owner is the address that deployed the contract. This is stored as an `immutable` value and cannot be transferred.
+
+## Set Accepting New Bets
+
+```
+setAcceptingNewBets(accepting)
+```
+
+`accepting`: `true` to allow new bets, `false` to block them.
+
+When set to `false`, `create()` will revert with `NewBetsDisabled`. All other actions on existing bets (join, confirm, leave, cancel, resolve, refund) remain unaffected. Defaults to `true`.
+
+Emits `AcceptingNewBetsChanged(bool accepting)`.
 
 ---
 
