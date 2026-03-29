@@ -47,7 +47,7 @@ contract BGAmble is ReentrancyGuard {
 
     // Upper bound on the per-participant stake (whole POL tokens). Caps the
     // financial incentive for oracle corruption while still allowing large bets.
-    uint96 public constant MAX_BET_AMOUNT = 10_000; // 10,000 POL
+    uint64 public constant MAX_BET_AMOUNT = 10_000; // 10,000 POL
 
     // Auto-incrementing bet ID counter. Starts at 1 so that betId 0 is never used,
     // which lets us treat betId == 0 as "does not exist" in storage checks.
@@ -112,8 +112,9 @@ contract BGAmble is ReentrancyGuard {
         uint8 confirmCount;        // how many participants have confirmed so far
         uint8 cancelVoteCount;     // how many participants voted to cancel so far
         BetState state;
-        uint96 amount;             // stake per participant (whole POL tokens, e.g. 10 = 10 POL)
+        uint64 amount;             // stake per participant (whole POL tokens, e.g. 10 = 10 POL)
         uint32 lockedAt;           // block.timestamp when the bet became Locked
+        uint32 createdAtBlock;     // block.number when the bet was created (for frontend event scanning)
 
         Participant[] participants;
         uint64[] resolvedWinnerIds;                   // set when Resolved, empty otherwise
@@ -129,8 +130,9 @@ contract BGAmble is ReentrancyGuard {
         uint8 confirmCount;
         uint8 cancelVoteCount;
         BetState state;
-        uint96 amount;
+        uint64 amount;
         uint32 lockedAt;
+        uint32 createdAtBlock;
         Participant[] participants;
         uint64[] resolvedWinnerIds;
     }
@@ -138,7 +140,7 @@ contract BGAmble is ReentrancyGuard {
     mapping(uint32 => Bet) public bets;
 
     // --- Events ---
-    event BetCreated(uint32 indexed betId, uint64 indexed bgaTableId, uint32 timestamp, address indexed triggeredBy, uint96 amount, uint8 slotCount, uint64 predictedWinner);
+    event BetCreated(uint32 indexed betId, uint64 indexed bgaTableId, uint32 timestamp, address indexed triggeredBy, uint64 amount, uint8 slotCount, uint64 predictedWinner);
     event BetJoined(uint32 indexed betId, uint32 timestamp, address indexed triggeredBy, uint64 predictedWinner);
     event BetConfirming(uint32 indexed betId, uint32 timestamp, address indexed triggeredBy);
     event BetLeft(uint32 indexed betId, uint32 timestamp, address indexed triggeredBy);
@@ -212,7 +214,7 @@ contract BGAmble is ReentrancyGuard {
     // Returns the new bet ID.
     function create(
         uint64 bgaTableId,
-        uint96 amount,
+        uint64 amount,
         uint8 slotCount,
         uint64 predictedWinner
     ) external payable nonReentrant returns (uint32) {
@@ -232,6 +234,7 @@ contract BGAmble is ReentrancyGuard {
         b.slotCount = slotCount;
         b.amount = amount;
         b.state = BetState.Open;
+        b.createdAtBlock = uint32(block.number);
 
         emit BetCreated(betId, bgaTableId, uint32(block.timestamp), msg.sender, amount, slotCount, predictedWinner);
 
@@ -569,6 +572,7 @@ contract BGAmble is ReentrancyGuard {
         s.state = b.state;
         s.amount = b.amount;
         s.lockedAt = b.lockedAt;
+        s.createdAtBlock = b.createdAtBlock;
         s.participants = b.participants;
         s.resolvedWinnerIds = b.resolvedWinnerIds;
         return s;

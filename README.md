@@ -442,7 +442,7 @@ Returns the winner IDs that were stored when the bet was resolved. Returns an em
 getBetSummary(betId) → BetSummary
 ```
 
-Returns a single bet's data as a `BetSummary` struct containing: `betId`, `bgaTableId`, `slotCount`, `confirmCount`, `cancelVoteCount`, `state`, `amount`, `lockedAt`, `participants[]`, and `resolvedWinnerIds[]`. Returns a zeroed struct for non-existent bets.
+Returns a single bet's data as a `BetSummary` struct containing: `betId`, `bgaTableId`, `slotCount`, `confirmCount`, `cancelVoteCount`, `state`, `amount`, `lockedAt`, `createdAtBlock`, `participants[]`, and `resolvedWinnerIds[]`. Returns a zeroed struct for non-existent bets.
 
 ## Get Bets By State
 

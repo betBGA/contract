@@ -246,6 +246,7 @@ describe("view functions", function () {
       expect(s.bgaTableId).to.equal(0);
       expect(s.slotCount).to.equal(0);
       expect(s.amount).to.equal(0);
+      expect(s.createdAtBlock).to.equal(0);
       expect(s.participants.length).to.equal(0);
     });
 
@@ -260,6 +261,7 @@ describe("view functions", function () {
       expect(s.state).to.equal(0); // Open
       expect(s.amount).to.equal(TEN_POL);
       expect(s.lockedAt).to.equal(0);
+      expect(s.createdAtBlock).to.be.greaterThan(0);
       expect(s.participants.length).to.equal(1);
       expect(s.participants[0].addr).to.equal(alice.address);
       expect(s.participants[0].predictedWinner).to.equal(winner);
