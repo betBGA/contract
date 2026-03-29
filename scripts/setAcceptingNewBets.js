@@ -4,9 +4,9 @@ async function main() {
   const contractAddress = process.env.BGAMBLE_ADDRESS;
   if (!contractAddress) throw new Error("Set BGAMBLE_ADDRESS in your .env file");
 
-  const arg = process.argv.at(-1);
+  const arg = process.env.ACCEPTING;
   if (arg !== "true" && arg !== "false") {
-    console.error("Usage: hardhat run scripts/setAcceptingNewBets.js --network <network> -- <true|false>");
+    console.error("Usage: ACCEPTING=<true|false> hardhat run scripts/setAcceptingNewBets.js --network <network>");
     process.exitCode = 1;
     return;
   }
