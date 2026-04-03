@@ -5,9 +5,8 @@ import {
   lockedBetFixture,
   confirmingBetFixture,
   createOpenBetFixture,
-  TEN_POL,
-  POL,
-  GAS_MARGIN,
+  TEN_USDT,
+  USDT_UNIT,
   ONE_DAY,
   timeTravel,
 } from "./helpers.js";
@@ -16,9 +15,9 @@ describe("refund", function () {
   // ── Positive tests ──────────────────────────────────────────────
 
   it("should allow refund after 24h + 1s", async function () {
-    const { bgamble, alice, ethers, networkHelpers } = await lockedBetFixture();
+    const { bgamble, alice, networkHelpers } = await lockedBetFixture();
     await timeTravel(networkHelpers, ONE_DAY + 1);
-    await expect(bgamble.connect(alice).refund(1)).to.not.be.revert(ethers);
+    await bgamble.connect(alice).refund(1);
   });
 
   it("should set state to Refunded", async function () {
@@ -30,42 +29,37 @@ describe("refund", function () {
   });
 
   it("should refund all participants their stakes (2 players)", async function () {
-    const { bgamble, ethers, alice, bob, networkHelpers } = await lockedBetFixture();
-    const aliceBefore = await ethers.provider.getBalance(alice.address);
-    const bobBefore = await ethers.provider.getBalance(bob.address);
+    const { bgamble, usdt, alice, bob, networkHelpers } = await lockedBetFixture();
+    const aliceBefore = await usdt.balanceOf(alice.address);
+    const bobBefore = await usdt.balanceOf(bob.address);
 
     await timeTravel(networkHelpers, ONE_DAY + 1);
     await bgamble.connect(alice).refund(1);
 
-    // Alice triggered tx (pays gas), Bob is passive receiver
-    const aliceDelta = await ethers.provider.getBalance(alice.address) - aliceBefore;
-    const bobDelta = await ethers.provider.getBalance(bob.address) - bobBefore;
-    expect(aliceDelta).to.be.greaterThan(TEN_POL * POL - GAS_MARGIN);
-    expect(aliceDelta).to.be.lessThanOrEqual(TEN_POL * POL);
-    expect(bobDelta).to.equal(TEN_POL * POL); // exact — didn't pay gas
+    expect(await usdt.balanceOf(alice.address) - aliceBefore).to.equal(TEN_USDT * USDT_UNIT);
+    expect(await usdt.balanceOf(bob.address) - bobBefore).to.equal(TEN_USDT * USDT_UNIT);
   });
 
   it("should refund all participants their stakes (3 players)", async function () {
-    const { bgamble, ethers, alice, bob, carol, networkHelpers } = await deployFixture();
+    const { bgamble, usdt, alice, bob, carol, networkHelpers } = await deployFixture();
     const w = 1;
-    await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, w, { value: TEN_POL * POL });
-    await bgamble.connect(carol).join(1, w, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+    await bgamble.connect(bob).join(1, w);
+    await bgamble.connect(carol).join(1, w);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
     await bgamble.connect(carol).confirm(1);
 
-    const aliceBefore = await ethers.provider.getBalance(alice.address);
-    const bobBefore = await ethers.provider.getBalance(bob.address);
-    const carolBefore = await ethers.provider.getBalance(carol.address);
+    const aliceBefore = await usdt.balanceOf(alice.address);
+    const bobBefore = await usdt.balanceOf(bob.address);
+    const carolBefore = await usdt.balanceOf(carol.address);
 
     await timeTravel(networkHelpers, ONE_DAY + 1);
     await bgamble.connect(alice).refund(1);
 
-    const aliceDelta = await ethers.provider.getBalance(alice.address) - aliceBefore;
-    expect(aliceDelta).to.be.greaterThan(TEN_POL * POL - GAS_MARGIN);
-    expect(await ethers.provider.getBalance(bob.address) - bobBefore).to.equal(TEN_POL * POL);
-    expect(await ethers.provider.getBalance(carol.address) - carolBefore).to.equal(TEN_POL * POL);
+    expect(await usdt.balanceOf(alice.address) - aliceBefore).to.equal(TEN_USDT * USDT_UNIT);
+    expect(await usdt.balanceOf(bob.address) - bobBefore).to.equal(TEN_USDT * USDT_UNIT);
+    expect(await usdt.balanceOf(carol.address) - carolBefore).to.equal(TEN_USDT * USDT_UNIT);
   });
 
   it("should emit BetRefunded event", async function () {
@@ -77,39 +71,39 @@ describe("refund", function () {
   });
 
   it("should leave the contract with 0 balance after refund", async function () {
-    const { bgamble, ethers, alice, networkHelpers } = await lockedBetFixture();
+    const { bgamble, usdt, alice, networkHelpers } = await lockedBetFixture();
     await timeTravel(networkHelpers, ONE_DAY + 1);
     await bgamble.connect(alice).refund(1);
-    const contractBalance = await ethers.provider.getBalance(await bgamble.getAddress());
+    const contractBalance = await usdt.balanceOf(await bgamble.getAddress());
     expect(contractBalance).to.equal(0);
   });
 
   it("should allow any participant to trigger the refund (not just creator)", async function () {
-    const { bgamble, bob, ethers, networkHelpers } = await lockedBetFixture();
+    const { bgamble, bob, networkHelpers } = await lockedBetFixture();
     await timeTravel(networkHelpers, ONE_DAY + 1);
-    await expect(bgamble.connect(bob).refund(1)).to.not.be.revert(ethers);
+    await bgamble.connect(bob).refund(1);
   });
 
   it("should not charge oracle fee on refund", async function () {
-    const { bgamble, ethers, alice, oracle1, oracle2, oracle3, oracle4, networkHelpers } = await lockedBetFixture();
-    const o1Before = await ethers.provider.getBalance(oracle1.address);
-    const o2Before = await ethers.provider.getBalance(oracle2.address);
-    const o3Before = await ethers.provider.getBalance(oracle3.address);
-    const o4Before = await ethers.provider.getBalance(oracle4.address);
+    const { bgamble, usdt, alice, oracle1, oracle2, oracle3, oracle4, networkHelpers } = await lockedBetFixture();
+    const o1Before = await usdt.balanceOf(oracle1.address);
+    const o2Before = await usdt.balanceOf(oracle2.address);
+    const o3Before = await usdt.balanceOf(oracle3.address);
+    const o4Before = await usdt.balanceOf(oracle4.address);
 
     await timeTravel(networkHelpers, ONE_DAY + 1);
     await bgamble.connect(alice).refund(1);
 
-    expect(await ethers.provider.getBalance(oracle1.address)).to.equal(o1Before);
-    expect(await ethers.provider.getBalance(oracle2.address)).to.equal(o2Before);
-    expect(await ethers.provider.getBalance(oracle3.address)).to.equal(o3Before);
-    expect(await ethers.provider.getBalance(oracle4.address)).to.equal(o4Before);
+    expect(await usdt.balanceOf(oracle1.address)).to.equal(o1Before);
+    expect(await usdt.balanceOf(oracle2.address)).to.equal(o2Before);
+    expect(await usdt.balanceOf(oracle3.address)).to.equal(o3Before);
+    expect(await usdt.balanceOf(oracle4.address)).to.equal(o4Before);
   });
 
   it("should allow refund well after 24h (e.g. 7 days)", async function () {
-    const { bgamble, alice, ethers, networkHelpers } = await lockedBetFixture();
+    const { bgamble, alice, networkHelpers } = await lockedBetFixture();
     await timeTravel(networkHelpers, 7 * ONE_DAY);
-    await expect(bgamble.connect(alice).refund(1)).to.not.be.revert(ethers);
+    await bgamble.connect(alice).refund(1);
   });
 
   // ── Negative tests ──────────────────────────────────────────────

@@ -1,22 +1,29 @@
 import hre from "hardhat";
 
 // Constants matching the contract
-export const ORACLE_FEE_BPS = 100n; // 1% in basis points
-export const TEN_POL = 10n; // 10 whole POL tokens (the default bet amount in tests)
-export const TEN_THOUSAND_POL = 10_000n; // max bet amount
-export const POL = 10n ** 18n; // 1 POL in wei — used for msg.value and balance math
-export const GAS_MARGIN = POL; // 1 POL margin for gas cost tolerance in balance checks
+export const ORACLE_FEE = 500_000n; // 0.50 USDT in 6-decimal base units
+export const MIN_BET_AMOUNT_USDT = 5n;
+export const TEN_USDT = 10n; // 10 whole USDT tokens (the default bet amount in tests)
+export const MAX_BET_AMOUNT_USDT = 250n;
+export const USDT_UNIT = 10n ** 6n; // 1 USDT in smallest unit — used for balance math
 export const ONE_DAY = 86400; // seconds
 
 /**
- * Computes the 1% oracle fee for a given prize pool in wei.
+ * Returns the fixed 0.50 USDT oracle fee (ignores arguments for backward compat).
  */
-export function oracleFee(prizePoolWei) {
-  return prizePoolWei * ORACLE_FEE_BPS / 10_000n;
+export function oracleFee() {
+  return ORACLE_FEE;
 }
 
 /**
- * Base fixture: deploys BGAmble with 4 oracle addresses.
+ * Convenience: returns the USDT balance (bigint) of `address`.
+ */
+export async function bal(usdtContract, address) {
+  return usdtContract.balanceOf(address);
+}
+
+/**
+ * Base fixture: deploys MockUSDT + BGAmble, mints & approves USDT for all players.
  *
  * Signers layout:
  *   deployer  – contract deployer (not an oracle, not a player)
@@ -30,19 +37,31 @@ export async function deployFixture() {
   const [deployer, oracle1, oracle2, oracle3, oracle4, alice, bob, carol, dave, eve] =
     await ethers.getSigners();
 
-  // Deploy BGAmble (no token needed — uses native POL)
+  // Deploy MockUSDT
+  const MockUSDT = await ethers.getContractFactory("MockUSDT");
+  const usdt = await MockUSDT.deploy();
+
+  // Deploy BGAmble with USDT address
   const BGAmble = await ethers.getContractFactory("BGAmble");
-  const bgamble = await BGAmble.deploy([
-    oracle1.address,
-    oracle2.address,
-    oracle3.address,
-    oracle4.address,
-  ]);
+  const bgamble = await BGAmble.deploy(
+    [oracle1.address, oracle2.address, oracle3.address, oracle4.address],
+    await usdt.getAddress(),
+  );
+
+  const bgambleAddress = await bgamble.getAddress();
+
+  // Mint USDT to all players and approve BGAmble to spend it
+  const mintAmount = 1_000_000n * USDT_UNIT; // 1 million USDT each
+  for (const signer of [alice, bob, carol, dave, eve]) {
+    await usdt.mint(signer.address, mintAmount);
+    await usdt.connect(signer).approve(bgambleAddress, mintAmount);
+  }
 
   return {
     ethers,
     networkHelpers,
     bgamble,
+    usdt,
     deployer,
     oracle1,
     oracle2,
@@ -64,7 +83,7 @@ export async function createOpenBetFixture() {
   const base = await deployFixture();
   const { bgamble, alice } = base;
   const winner = 1;
-  await bgamble.connect(alice).create(1, TEN_POL, 2, winner, { value: TEN_POL * POL });
+  await bgamble.connect(alice).create(1, TEN_USDT, 2, winner);
   return { ...base, betId: 1, winner };
 }
 
@@ -76,8 +95,8 @@ export async function confirmingBetFixture() {
   const { bgamble, alice, bob } = base;
   const winnerA = 1;
   const winnerB = 2;
-  await bgamble.connect(alice).create(1, TEN_POL, 2, winnerA, { value: TEN_POL * POL });
-  await bgamble.connect(bob).join(1, winnerB, { value: TEN_POL * POL });
+  await bgamble.connect(alice).create(1, TEN_USDT, 2, winnerA);
+  await bgamble.connect(bob).join(1, winnerB);
   return { ...base, betId: 1, winnerA, winnerB };
 }
 
@@ -89,8 +108,8 @@ export async function lockedBetFixture() {
   const { bgamble, alice, bob } = base;
   const winnerA = 1;
   const winnerB = 2;
-  await bgamble.connect(alice).create(1, TEN_POL, 2, winnerA, { value: TEN_POL * POL });
-  await bgamble.connect(bob).join(1, winnerB, { value: TEN_POL * POL });
+  await bgamble.connect(alice).create(1, TEN_USDT, 2, winnerA);
+  await bgamble.connect(bob).join(1, winnerB);
   await bgamble.connect(alice).confirm(1);
   await bgamble.connect(bob).confirm(1);
   return { ...base, betId: 1, winnerA, winnerB };
@@ -105,9 +124,9 @@ export async function lockedBet3PlayersFixture() {
   const winnerA = 1;
   const winnerB = 2;
   const winnerC = 3;
-  await bgamble.connect(alice).create(1, TEN_POL, 3, winnerA, { value: TEN_POL * POL });
-  await bgamble.connect(bob).join(1, winnerB, { value: TEN_POL * POL });
-  await bgamble.connect(carol).join(1, winnerC, { value: TEN_POL * POL });
+  await bgamble.connect(alice).create(1, TEN_USDT, 3, winnerA);
+  await bgamble.connect(bob).join(1, winnerB);
+  await bgamble.connect(carol).join(1, winnerC);
   await bgamble.connect(alice).confirm(1);
   await bgamble.connect(bob).confirm(1);
   await bgamble.connect(carol).confirm(1);

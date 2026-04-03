@@ -11,7 +11,7 @@ The system is designed to be:
 * **Low gas cost** for players
 * **Low operational cost** for oracles
 
-The smart contract will be deployed on Polygon because of its low gas fees. All bets are denominated in **POL**, the native Polygon token.
+The smart contract will be deployed on Polygon because of its low gas fees. All bets are denominated in **USDT** (6 decimals). **POL** is only needed to pay Polygon gas fees.
 
 ---
 
@@ -19,7 +19,7 @@ The smart contract will be deployed on Polygon because of its low gas fees. All 
 
 A **bet** represents a wager between a fixed number of participants on the outcome of a specific game.
 
-Each participant stakes an equal amount of **POL** (whole tokens, 10–10,000).
+Each participant stakes an equal amount of **USDT** (whole tokens, 5–250).
 
 When the game ends:
 
@@ -47,15 +47,14 @@ Games may end with:
 * multiple winners
 * a tie
 
-The prize pool is divided **equally among all winners** after deducting a 1% oracle fee.
+The prize pool is divided **equally among all winners** after deducting a fixed **0.50 USDT** oracle fee.
 
-Example (3 players, 10 POL stake each, prize pool = 29.70 POL after 1% fee):
+Example (2 players, 10 USDT stake each, prize pool = 19.50 USDT after the 0.50 USDT fee):
 
-| Players | Winners | Result                                    |
-| ------- | ------- | ----------------------------------------- |
-| 3       | 1       | winner receives 29.70 POL                 |
-| 3       | 2       | each winner receives 14.85 POL            |
-| 3       | 3       | tie → each receives 9.90 POL              |
+| Players | Winners | Result                         |
+| ------- | ------- | ------------------------------ |
+| 2       | 1       | winner receives 19.50 USDT    |
+| 2       | 2       | each winner receives 9.75 USDT |
 
 ---
 
@@ -72,7 +71,7 @@ The contract requires:
 
 ### Maximum bet amount
 
-The maximum bet amount is capped at **10,000 POL** per participant. The minimum is **10 POL**. These limits are enforced on-chain in the `create` function.
+The maximum bet amount is capped at **250 USDT** per participant. The minimum is **5 USDT**. These limits are enforced on-chain in the `create` function.
 
 The cap exists to reduce the financial incentive for oracles to become corrupted — keeping the potential payout per bet bounded limits the reward for dishonest behavior, while still allowing relatively large bets.
 
@@ -80,7 +79,7 @@ The cap exists to reduce the financial incentive for oracles to become corrupted
 
 ### Oracle compensation
 
-Oracles are compensated for their operational and transaction costs. For every resolved bet, one oracle receives a fee of **1% of the total prize pool**, paid from the prize pool. No oracle fee is charged when a bet ends in NoConsensus, Cancelled, or Refunded state.
+Oracles are compensated for their operational and transaction costs. For every resolved bet, one oracle receives a fixed fee of **0.50 USDT**, paid from the prize pool. No oracle fee is charged when a bet ends in NoConsensus, Cancelled, or Refunded state.
 This is done in round-robin fashion without looking at who reported the actual result leading to consensus for this bet, to avoid wars between oracles.
 
 ---
@@ -119,7 +118,7 @@ The design allows a frontend to:
 
 The smart contract is responsible for:
 
-* holding bet escrow funds (native POL)
+* holding bet escrow funds (USDT)
 * managing participant membership
 * enforcing bet confirmation
 * handling cancellation consensus
@@ -127,7 +126,7 @@ The smart contract is responsible for:
 * distributing winnings
 * allowing the owner to halt new bet creation
 
-The contract uses **OpenZeppelin's ReentrancyGuard** to protect against reentrancy attacks on native token transfers.
+The contract uses **OpenZeppelin's SafeERC20** for compatibility with non-standard ERC-20 implementations such as USDT, and **OpenZeppelin's ReentrancyGuard** to protect state-changing flows that transfer escrowed funds.
 
 ---
 
@@ -213,8 +212,8 @@ Transition conditions:
 The bet outcome has been finalized.
 
 Actions performed:
-1. Calculate prize pool (amount × participantCount × 1e18)
-2. Deduct the 1% oracle fee
+1. Calculate prize pool (amount × participantCount × 1e6)
+2. Deduct the fixed 0.50 USDT oracle fee
 3. Send oracle fee to the round-robin oracle for this bet (based on betId, not based on who reported results)
 4. Distribute winnings
 
@@ -266,7 +265,7 @@ Multiple winners or even no winners can be reported by the oracles, depending on
 **Important:** Oracle consensus is based on the keccak256 hash of the `winnerIds` array. This means all oracles **must report winner IDs in the exact same order** for their reports to match. Oracles must sort `winnerIds` in ascending order before submitting. If two oracles report the same winners in a different order, the hashes will differ and consensus will not be reached.
 
 ## Oracle fee
-Oracles are compensated for their operational and transaction costs with a fee of **1% of the total prize pool** per resolved bet.
+Oracles are compensated for their operational and transaction costs with a fixed fee of **0.50 USDT** per resolved bet.
 For simplicity, oracles are paid in round-robin fashion without looking at who reported the actual result leading to consensus for this bet, to avoid wars between oracles.
 
 ## Oracle trust mode
@@ -276,7 +275,7 @@ Participants inherently will have to trust that at least 3 of the 4 oracles will
 If three oracles were to become fraudulent, it will be easy for participants to identify the fraud since game results can be verified by anyone on BGA, even without an account.
 This should result in the community replacing the dishonest oracles.
 
-Additionally, the maximum bet amount of 10,000 POL per participant caps the potential profit from oracle corruption, further reducing the incentive for dishonest behavior.
+Additionally, the maximum bet amount of 250 USDT per participant caps the potential profit from oracle corruption, further reducing the incentive for dishonest behavior.
 
 ---
 
@@ -285,25 +284,26 @@ Additionally, the maximum bet amount of 10,000 POL per participant caps the pote
 The prize pool is calculated dynamically:
 
 ```
-prizePool = betAmount × participantCount × 1e18 (in wei)
-oracleFee = prizePool × 1%
+prizePool = betAmount × participantCount × 1e6 (USDT base units)
+oracleFee = 0.50 USDT
 payout    = prizePool − oracleFee
 ```
 
 Example:
 
-| Players | Stake  | Fee (1%) | Prize Pool |
-| ------- | ------ | -------- | ---------- |
-| 3       | 10 POL | 0.30 POL | 29.70 POL  |
+| Players | Stake   | Fee       | Prize Pool |
+| ------- | ------- | --------- | ---------- |
+| 2       | 10 USDT | 0.50 USDT | 19.50 USDT |
 
 
 Remaining funds are distributed to winners:
 
-| Scenario  | Payout    |
-| --------- | --------- |
-| 1 winner  | 29.70 POL |
-| 2 winners | 14.85 POL |
-| 3 winners | 9.90 POL  |
+| Scenario  | Payout      |
+| --------- | ----------- |
+| 1 winner  | 19.50 USDT  |
+| 2 winners | 9.75 USDT each |
+
+If an equal split leaves a 0.000001 USDT remainder, the contract assigns that dust to the last winner.
 
 
 ---
@@ -313,14 +313,14 @@ Remaining funds are distributed to winners:
 ## Create Bet
 
 ```
-create(bgaTableId, amount, slotCount, predictedWinner) payable
+create(bgaTableId, amount, slotCount, predictedWinner)
 ```
 
 `bgaTableId`: the numeric table ID of the corresponding game on Board Game Arena.
-`amount`: the amount of whole POL tokens to be staked by each participant (e.g. 10 = 10 POL). Minimum 10, maximum 10,000.
+`amount`: the amount of whole USDT tokens to be staked by each participant (e.g. 10 = 10 USDT). Minimum 5, maximum 250.
 `slotCount`: the total number of participant slots for this bet (between 2 and 10).
 `predictedWinner`: the numeric BGA player ID that is being predicted as winner.
-`msg.value`: must equal `amount × 1e18` (the stake in wei).
+Before calling `create`, the caller must approve the contract to spend `amount × 1e6` USDT on their behalf.
 
 The creator automatically joins the bet with their predicted winner.
 
@@ -331,10 +331,10 @@ Reverts with `NewBetsDisabled` if the owner has disabled new bet creation.
 ## Join Bet
 
 ```
-join(betId, predictedWinner) payable
+join(betId, predictedWinner)
 ```
 
-The caller must send `amount × 1e18` wei as `msg.value`. Registers the participant's predicted winner.
+Before calling `join`, the caller must approve the contract to spend the bet's stake amount in USDT (`amount × 1e6`). Registers the participant's predicted winner.
 
 ---
 
@@ -365,7 +365,7 @@ Confirming
 
 Leaving:
 
-* refunds the participant's stake in POL
+* refunds the participant's stake in USDT
 * resets confirmations for all remaining participants
 
 ---
@@ -406,7 +406,7 @@ Rules:
 * only authorized oracles may report
 * each oracle may report only once per bet
 * 3 matching reports resolve the bet
-* 4 reports with no 3 agreeing trigger no-consensus (funds distributed equally)
+* 4 reports with no 3 agreeing trigger no-consensus (all participants are refunded in full)
 
 
 ---
@@ -514,7 +514,7 @@ Potential future upgrades include:
 
 BGAmble provides a **trust-minimized betting layer for multiplayer games**, combining:
 
-* smart contract escrow (native POL)
+* smart contract escrow (USDT)
 * oracle-verified results
 * participant consensus controls
 * gas-optimized storage

@@ -10,17 +10,21 @@ async function main() {
   const oracle2 = process.env.ORACLE_2;
   const oracle3 = process.env.ORACLE_3;
   const oracle4 = process.env.ORACLE_4;
+  const usdtAddress = process.env.USDT_ADDRESS;
   if (!oracle1 || !oracle2 || !oracle3 || !oracle4)
     throw new Error("Set ORACLE_1, ORACLE_2, ORACLE_3, ORACLE_4 in your .env file");
+  if (!usdtAddress)
+    throw new Error("Set USDT_ADDRESS in your .env file");
 
   const networkName = connection.networkName;
 
   console.log("Deploying BGAmble...");
   console.log("  Network :", networkName);
   console.log("  Oracles :", oracle1, oracle2, oracle3, oracle4);
+  console.log("  USDT    :", usdtAddress);
 
   const BGAmble = await ethers.getContractFactory("BGAmble");
-  const constructorArgs = [[oracle1, oracle2, oracle3, oracle4]];
+  const constructorArgs = [[oracle1, oracle2, oracle3, oracle4], usdtAddress];
   const contract = await BGAmble.deploy(...constructorArgs);
   await contract.waitForDeployment();
 

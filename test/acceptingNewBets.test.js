@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, createOpenBetFixture, TEN_POL, POL } from "./helpers.js";
+import { deployFixture, createOpenBetFixture, TEN_USDT } from "./helpers.js";
 
 describe("acceptingNewBets", function () {
   // ── Positive tests ──────────────────────────────────────────────
@@ -24,7 +24,7 @@ describe("acceptingNewBets", function () {
   });
 
   it("should emit AcceptingNewBetsChanged when toggled", async function () {
-    const { bgamble, deployer, ethers } = await deployFixture();
+    const { bgamble, deployer } = await deployFixture();
     await expect(bgamble.connect(deployer).setAcceptingNewBets(false))
       .to.emit(bgamble, "AcceptingNewBetsChanged")
       .withArgs(false);
@@ -39,28 +39,24 @@ describe("acceptingNewBets", function () {
   });
 
   it("should block create() when disabled", async function () {
-    const { bgamble, deployer, alice, ethers } = await deployFixture();
+    const { bgamble, deployer, alice } = await deployFixture();
     await bgamble.connect(deployer).setAcceptingNewBets(false);
     await expect(
-      bgamble.connect(alice).create(1, TEN_POL, 2, 1, { value: TEN_POL * POL })
+      bgamble.connect(alice).create(1, TEN_USDT, 2, 1)
     ).to.be.revertedWithCustomError(bgamble, "NewBetsDisabled");
   });
 
   it("should allow create() again after re-enabling", async function () {
-    const { bgamble, deployer, alice, ethers } = await deployFixture();
+    const { bgamble, deployer, alice } = await deployFixture();
     await bgamble.connect(deployer).setAcceptingNewBets(false);
     await bgamble.connect(deployer).setAcceptingNewBets(true);
-    await expect(
-      bgamble.connect(alice).create(1, TEN_POL, 2, 1, { value: TEN_POL * POL })
-    ).to.not.be.revert(ethers);
+    await bgamble.connect(alice).create(1, TEN_USDT, 2, 1);
   });
 
   it("should still allow join() on existing bets when disabled", async function () {
-    const { bgamble, deployer, bob, ethers } = await createOpenBetFixture();
+    const { bgamble, deployer, bob } = await createOpenBetFixture();
     await bgamble.connect(deployer).setAcceptingNewBets(false);
-    await expect(
-      bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL })
-    ).to.not.be.revert(ethers);
+    await bgamble.connect(bob).join(1, 2);
   });
 
   // ── Negative tests ──────────────────────────────────────────────

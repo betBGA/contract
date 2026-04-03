@@ -2,17 +2,22 @@
 pragma solidity ^0.8.34;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // BGAmble is a smart contract for betting on the outcome of online boardgames
 // at Board Game Arena (BGA). Players create/join bets, lock them once everyone
 // confirms, and have the result resolved by 4 independent oracle nodes that
 // need 3-of-4 consensus. Funds are held in escrow and distributed automatically.
-// All bets are denominated in POL (the native Polygon token).
+// All bets are denominated in USDT (6 decimals).
 contract BGAmble is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
 
     // --- Custom Errors (cheaper than string reverts) ---
     error InvalidOracleAddress(uint8 index);
     error DuplicateOracleAddress();
+    error InvalidTokenAddress();
     error NotOracle();
     error NotParticipant();
     error SlotCountTooLow();
@@ -32,24 +37,26 @@ contract BGAmble is ReentrancyGuard {
     error AlreadyReported();
     error RefundTooEarly();
     error LimitMustBePositive();
-    error IncorrectValue();
     error TransferFailed();
     error NotOwner();
     error NewBetsDisabled();
 
-    // 1 POL in wei (10^18). Used to convert whole-token amounts to wei for
-    // msg.value checks and native token transfers.
-    uint256 private constant ONE_POL = 1e18;
+    // 1 USDT in smallest unit (10^6). Used to convert whole-token amounts to
+    // the token's base unit for ERC-20 transfer calls.
+    uint256 private constant ONE_USDT = 1e6;
 
-    // Oracle fee in basis points (1% = 100 bps). Deducted from the prize pool
-    // on every resolved bet and paid to one oracle in round-robin fashion.
-    // Compensates oracles for hosting and gas costs. No fee is charged on
-    // NoConsensus/Cancelled/Refunded.
-    uint256 public constant ORACLE_FEE_BPS = 100; // 1%
+    // Fixed oracle fee: 0.50 USDT (in 6-decimal base units). Deducted from the
+    // prize pool on every resolved bet and paid to one oracle in round-robin
+    // fashion. Compensates oracles for hosting and gas costs. No fee is charged
+    // on NoConsensus/Cancelled/Refunded.
+    uint256 public constant ORACLE_FEE = 500_000; // 0.50 USDT
 
-    // Upper bound on the per-participant stake (whole POL tokens). Caps the
-    // financial incentive for oracle corruption while still allowing large bets.
-    uint64 public constant MAX_BET_AMOUNT = 10_000; // 10,000 POL
+    // Upper bound on the per-participant stake (whole USDT tokens). Caps the
+    // financial incentive for oracle corruption while still allowing meaningful bets.
+    uint64 public constant MAX_BET_AMOUNT = 250; // 250 USDT
+
+    // The USDT token contract used for all stakes and payouts.
+    IERC20 public immutable usdt;
 
     // The address that deployed the contract. Only this address may toggle
     // acceptingNewBets.
@@ -122,7 +129,7 @@ contract BGAmble is ReentrancyGuard {
         uint8 confirmCount;        // how many participants have confirmed so far
         uint8 cancelVoteCount;     // how many participants voted to cancel so far
         BetState state;
-        uint64 amount;             // stake per participant (whole POL tokens, e.g. 10 = 10 POL)
+        uint64 amount;             // stake per participant (whole USDT tokens, e.g. 10 = 10 USDT)
         uint32 lockedAt;           // block.timestamp when the bet became Locked
         uint32 createdAtBlock;     // block.number when the bet was created (for frontend event scanning)
 
@@ -164,9 +171,9 @@ contract BGAmble is ReentrancyGuard {
     event BetRefunded(uint32 indexed betId, uint32 timestamp, address indexed triggeredBy);
     event OracleReported(uint32 indexed betId, uint32 timestamp, address indexed triggeredBy, bytes32 resultHash, uint64[] winnerIds);
 
-    // Initialises the contract with exactly 4 unique oracle addresses.
-    // These cannot be changed after deployment.
-    constructor(address[4] memory _oracles) {
+    // Initialises the contract with exactly 4 unique oracle addresses and the
+    // USDT token address. These cannot be changed after deployment.
+    constructor(address[4] memory _oracles, address _usdt) {
         owner = msg.sender;
 
         if (_oracles[0] == address(0)) revert InvalidOracleAddress(1);
@@ -182,7 +189,10 @@ contract BGAmble is ReentrancyGuard {
             _oracles[2] == _oracles[3]
         ) revert DuplicateOracleAddress();
 
+        if (_usdt == address(0)) revert InvalidTokenAddress();
+
         oracles = _oracles;
+        usdt = IERC20(_usdt);
     }
 
     // --- Modifiers ---
@@ -219,21 +229,21 @@ contract BGAmble is ReentrancyGuard {
     // --- Participant Actions ---
 
     // Creates a new bet for a Board Game Arena table.
-    // The caller specifies the BGA table ID, the per-participant stake (10–10,000
-    // whole POL tokens), the number of participant slots (2–10), and their own
-    // predicted winner. The caller must send exactly `amount * 1e18` wei as
-    // msg.value. The creator is automatically joined as the first participant.
-    // Returns the new bet ID.
+    // The caller specifies the BGA table ID, the per-participant stake (5–250
+    // whole USDT tokens), the number of participant slots (2–10), and their own
+    // predicted winner. The caller must have approved the contract for at least
+    // `amount * 1e6` USDT. The creator is automatically joined as the first
+    // participant. Returns the new bet ID.
     function create(
         uint64 bgaTableId,
         uint64 amount,
         uint8 slotCount,
         uint64 predictedWinner
-    ) external payable nonReentrant returns (uint32) {
+    ) external nonReentrant returns (uint32) {
         if (!acceptingNewBets) revert NewBetsDisabled();
         if (slotCount < 2) revert SlotCountTooLow();
         if (slotCount > 10) revert SlotCountTooHigh();
-        if (amount < 10) revert BetAmountTooLow();
+        if (amount < 5) revert BetAmountTooLow();
         if (amount > MAX_BET_AMOUNT) revert BetAmountTooHigh();
         if (bgaTableId == 0) revert InvalidTableId();
 
@@ -257,14 +267,15 @@ contract BGAmble is ReentrancyGuard {
     }
 
     // Joins an existing bet that is still Open (has available slots).
-    // The caller must send exactly the bet's amount in POL (amount * 1e18 wei).
-    function join(uint32 betId, uint64 predictedWinner) external payable nonReentrant {
+    // The caller must have approved the contract for at least the bet's amount
+    // in USDT (amount * 1e6).
+    function join(uint32 betId, uint64 predictedWinner) external nonReentrant {
         _join(betId, predictedWinner);
     }
 
     // Internal implementation of join, also called by create() for the bet creator.
     // Validates the bet is Open and not full, ensures the caller isn't already in,
-    // pushes a new Participant, verifies msg.value matches the stake, and
+    // pushes a new Participant, pulls USDT from the caller via transferFrom, and
     // automatically transitions the bet to Confirming once all slots are filled.
     function _join(uint32 betId, uint64 predictedWinner) internal {
         Bet storage b = bets[betId];
@@ -277,8 +288,9 @@ contract BGAmble is ReentrancyGuard {
             if (b.participants[i].addr == msg.sender) revert AlreadyParticipant();
         }
 
-        // Verify the caller sent exactly the right amount of POL
-        if (msg.value != uint256(b.amount) * ONE_POL) revert IncorrectValue();
+        // Pull USDT from the caller into this contract
+        uint256 stakeAmount = uint256(b.amount) * ONE_USDT;
+        usdt.safeTransferFrom(msg.sender, address(this), stakeAmount);
 
         b.participants.push(Participant({
             addr: msg.sender,
@@ -360,7 +372,7 @@ contract BGAmble is ReentrancyGuard {
 
         emit BetLeft(betId, uint32(block.timestamp), msg.sender);
 
-        _sendPOL(msg.sender, uint256(b.amount) * ONE_POL);
+        _sendUSDT(msg.sender, uint256(b.amount) * ONE_USDT);
     }
 
     // Casts a vote to cancel a Locked bet. If ALL participants vote to cancel,
@@ -390,7 +402,7 @@ contract BGAmble is ReentrancyGuard {
             emit BetCancelled(betId, uint32(block.timestamp), msg.sender);
 
             for (uint i = 0; i < participantCount; i++) {
-                _sendPOL(b.participants[i].addr, uint256(b.amount) * ONE_POL);
+                _sendUSDT(b.participants[i].addr, uint256(b.amount) * ONE_USDT);
             }
         }
     }
@@ -435,9 +447,9 @@ contract BGAmble is ReentrancyGuard {
 
     // Distributes the prize pool after 3 oracles reach consensus.
     //
-    // 1. Calculates the total prize pool (amount × ONE_POL × participant count).
-    // 2. Deducts a 1% oracle fee and sends it to one oracle, chosen by
-    //    round-robin (betId % 4) — deliberately not based on who reported,
+    // 1. Calculates the total prize pool (amount × ONE_USDT × participant count).
+    // 2. Deducts a fixed 0.50 USDT oracle fee and sends it to one oracle, chosen
+    //    by round-robin (betId % 4) — deliberately not based on who reported,
     //    to avoid competition between oracles.
     // 3. Matches each participant's predicted winner against the reported winners.
     // 4. If nobody predicted correctly, everyone is treated as a winner (the pool
@@ -452,8 +464,8 @@ contract BGAmble is ReentrancyGuard {
         b.state = BetState.Resolved;
         b.resolvedWinnerIds = winnerIds;
 
-        uint256 prizePool = uint256(b.amount) * ONE_POL * b.participants.length;
-        uint256 oracleFee = prizePool * ORACLE_FEE_BPS / 10_000;
+        uint256 prizePool = uint256(b.amount) * ONE_USDT * b.participants.length;
+        uint256 oracleFee = ORACLE_FEE;
         uint256 payout = prizePool - oracleFee;
 
         // Determine winners
@@ -483,7 +495,7 @@ contract BGAmble is ReentrancyGuard {
 
         // Pay oracle fee (round-robin by betId, not by who reported)
         uint256 oracleIndex = betId % oracles.length;
-        _sendPOL(oracles[oracleIndex], oracleFee);
+        _sendUSDT(oracles[oracleIndex], oracleFee);
 
         uint256 share = payout / winnerCount;
         uint256 remainder = payout % winnerCount; // dust
@@ -497,7 +509,7 @@ contract BGAmble is ReentrancyGuard {
                 if (distributed == winnerCount - 1) {
                     amount += remainder;
                 }
-                _sendPOL(b.participants[i].addr, amount);
+                _sendUSDT(b.participants[i].addr, amount);
                 distributed++;
             }
         }
@@ -516,7 +528,7 @@ contract BGAmble is ReentrancyGuard {
 
         uint256 participantCount = b.participants.length;
         for (uint i = 0; i < participantCount; i++) {
-            _sendPOL(b.participants[i].addr, uint256(b.amount) * ONE_POL);
+            _sendUSDT(b.participants[i].addr, uint256(b.amount) * ONE_USDT);
         }
     }
 
@@ -535,16 +547,16 @@ contract BGAmble is ReentrancyGuard {
 
         uint256 participantCount = b.participants.length;
         for (uint i = 0; i < participantCount; i++) {
-            _sendPOL(b.participants[i].addr, uint256(b.amount) * ONE_POL);
+            _sendUSDT(b.participants[i].addr, uint256(b.amount) * ONE_USDT);
         }
     }
 
     // --- Internal Helpers ---
 
-    // Sends native POL to an address. Reverts if the transfer fails.
-    function _sendPOL(address to, uint256 weiAmount) internal {
-        (bool success, ) = to.call{value: weiAmount}("");
-        if (!success) revert TransferFailed();
+    // Sends USDT to an address using SafeERC20 for compatibility with
+    // non-standard ERC-20 implementations such as some USDT deployments.
+    function _sendUSDT(address to, uint256 amount) internal {
+        usdt.safeTransfer(to, amount);
     }
 
     // --- Owner Actions ---

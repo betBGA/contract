@@ -1,13 +1,13 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, confirmingBetFixture, TEN_POL, POL } from "./helpers.js";
+import { deployFixture, confirmingBetFixture, TEN_USDT } from "./helpers.js";
 
 describe("confirm", function () {
   // ── Positive tests ──────────────────────────────────────────────
 
   it("should allow a participant to confirm", async function () {
-    const { bgamble, alice, ethers } = await confirmingBetFixture();
-    await expect(bgamble.connect(alice).confirm(1)).to.not.be.revert(ethers);
+    const { bgamble, alice } = await confirmingBetFixture();
+    await bgamble.connect(alice).confirm(1);
   });
 
   it("should increment confirmCount on confirmation", async function () {
@@ -54,11 +54,11 @@ describe("confirm", function () {
   });
 
   it("should work with a 3-player bet", async function () {
-    const { bgamble, alice, bob, carol, ethers } = await deployFixture();
+    const { bgamble, alice, bob, carol } = await deployFixture();
     const w = 1;
-    await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, w, { value: TEN_POL * POL });
-    await bgamble.connect(carol).join(1, w, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+    await bgamble.connect(bob).join(1, w);
+    await bgamble.connect(carol).join(1, w);
 
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
@@ -73,9 +73,9 @@ describe("confirm", function () {
   // ── Negative tests ──────────────────────────────────────────────
 
   it("should revert if bet is in Open state", async function () {
-    const { bgamble, alice, ethers } = await deployFixture();
+    const { bgamble, alice } = await deployFixture();
     const w = 1;
-    await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
     await expect(bgamble.connect(alice).confirm(1)).to.be.revertedWithCustomError(bgamble, "BetNotConfirming");
   });
 
@@ -98,7 +98,7 @@ describe("confirm", function () {
   });
 
   it("should revert for non-existent betId", async function () {
-    const { bgamble, alice, ethers } = await deployFixture();
-    await expect(bgamble.connect(alice).confirm(99)).to.be.revert(ethers);
+    const { bgamble, alice } = await deployFixture();
+    await expect(bgamble.connect(alice).confirm(99)).to.be.revertedWithCustomError(bgamble, "NotParticipant");
   });
 });

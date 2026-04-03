@@ -1,24 +1,28 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, createOpenBetFixture, confirmingBetFixture, lockedBetFixture, TEN_POL, POL, GAS_MARGIN } from "./helpers.js";
+import {
+  deployFixture,
+  createOpenBetFixture,
+  confirmingBetFixture,
+  lockedBetFixture,
+  TEN_USDT,
+  USDT_UNIT,
+} from "./helpers.js";
 
 describe("leave", function () {
   // ── Positive tests ──────────────────────────────────────────────
 
-  it("should allow a participant to leave an Open bet", async function () {
-    const { bgamble, alice, ethers } = await createOpenBetFixture();
-    await expect(bgamble.connect(alice).leave(1)).to.not.be.revert(ethers);
+  it("should allow leaving an Open bet", async function () {
+    const { bgamble, alice } = await createOpenBetFixture();
+    await bgamble.connect(alice).leave(1);
   });
 
-  it("should refund the stake to the leaving player", async function () {
-    const { bgamble, alice, ethers } = await createOpenBetFixture();
-    const balanceBefore = await ethers.provider.getBalance(alice.address);
+  it("should refund the participant stake when leaving an Open bet", async function () {
+    const { bgamble, usdt, alice } = await createOpenBetFixture();
+    const balanceBefore = await usdt.balanceOf(alice.address);
     await bgamble.connect(alice).leave(1);
-    const balanceAfter = await ethers.provider.getBalance(alice.address);
-    // Receives refund but pays gas, so net gain is slightly less than TEN_POL * POL
-    const delta = balanceAfter - balanceBefore;
-    expect(delta).to.be.greaterThan(TEN_POL * POL - GAS_MARGIN);
-    expect(delta).to.be.lessThanOrEqual(TEN_POL * POL);
+    const balanceAfter = await usdt.balanceOf(alice.address);
+    expect(balanceAfter - balanceBefore).to.equal(TEN_USDT * USDT_UNIT);
   });
 
   it("should emit BetLeft event", async function () {
@@ -36,8 +40,8 @@ describe("leave", function () {
   });
 
   it("should allow leaving a Confirming bet", async function () {
-    const { bgamble, alice, ethers } = await confirmingBetFixture();
-    await expect(bgamble.connect(alice).leave(1)).to.not.be.revert(ethers);
+    const { bgamble, alice } = await confirmingBetFixture();
+    await bgamble.connect(alice).leave(1);
   });
 
   it("should reset state to Open when leaving a Confirming bet", async function () {
@@ -59,24 +63,23 @@ describe("leave", function () {
     const { bgamble, alice, bob } = await confirmingBetFixture();
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).leave(1);
-
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(1);
     expect(participants[0].confirmed).to.equal(false);
   });
 
   it("should allow another player to join after someone leaves", async function () {
-    const { bgamble, alice, bob, carol, ethers } = await confirmingBetFixture();
+    const { bgamble, bob, carol } = await confirmingBetFixture();
     await bgamble.connect(bob).leave(1);
     const w = 3;
-    await expect(bgamble.connect(carol).join(1, w, { value: TEN_POL * POL })).to.not.be.revert(ethers);
+    await bgamble.connect(carol).join(1, w);
   });
 
   it("should handle swap-and-pop correctly when first participant leaves", async function () {
-    const { bgamble, alice, bob, ethers } = await deployFixture();
+    const { bgamble, alice, bob } = await deployFixture();
     const w = 1;
-    await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+    await bgamble.connect(bob).join(1, 2);
     await bgamble.connect(alice).leave(1);
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(1);
@@ -84,10 +87,10 @@ describe("leave", function () {
   });
 
   it("should handle swap-and-pop correctly when middle participant leaves (3 players)", async function () {
-    const { bgamble, alice, bob, carol, ethers } = await deployFixture();
-    await bgamble.connect(alice).create(1, TEN_POL, 3, 1, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
-    await bgamble.connect(carol).join(1, 3, { value: TEN_POL * POL });
+    const { bgamble, alice, bob, carol } = await deployFixture();
+    await bgamble.connect(alice).create(1, TEN_USDT, 3, 1);
+    await bgamble.connect(bob).join(1, 2);
+    await bgamble.connect(carol).join(1, 3);
     await bgamble.connect(bob).leave(1);
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(2);
@@ -96,10 +99,10 @@ describe("leave", function () {
   });
 
   it("should handle the last participant leaving (3 players)", async function () {
-    const { bgamble, alice, bob, carol, ethers } = await deployFixture();
-    await bgamble.connect(alice).create(1, TEN_POL, 3, 1, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
-    await bgamble.connect(carol).join(1, 3, { value: TEN_POL * POL });
+    const { bgamble, alice, bob, carol } = await deployFixture();
+    await bgamble.connect(alice).create(1, TEN_USDT, 3, 1);
+    await bgamble.connect(bob).join(1, 2);
+    await bgamble.connect(carol).join(1, 3);
     await bgamble.connect(carol).leave(1);
     const participants = await bgamble.getParticipants(1);
     expect(participants.length).to.equal(2);
@@ -115,10 +118,11 @@ describe("leave", function () {
   });
 
   it("should revert if bet is Resolved", async function () {
-    const { bgamble, alice, oracle1, oracle2, ethers } = await lockedBetFixture();
+    const { bgamble, alice, oracle1, oracle2, oracle3 } = await lockedBetFixture();
     const winners = [1];
     await bgamble.connect(oracle1).reportResult(1, winners);
     await bgamble.connect(oracle2).reportResult(1, winners);
+    await bgamble.connect(oracle3).reportResult(1, winners);
     await expect(bgamble.connect(alice).leave(1)).to.be.revertedWithCustomError(bgamble, "CannotLeaveBet");
   });
 

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, TEN_POL, POL, oracleFee } from "./helpers.js";
+import { deployFixture, TEN_USDT, USDT_UNIT, ORACLE_FEE } from "./helpers.js";
 
 const BGA_TABLE_ID = 824948982n;
 const BGA_PLAYER_A = 85291463n;
@@ -15,16 +15,16 @@ describe("big BGA IDs (uint64)", function () {
   // ── Realistic BGA IDs ───────────────────────────────────────────
 
   it("should create a bet with a realistic BGA table ID", async function () {
-    const { bgamble, alice, ethers } = await deployFixture();
-    await expect(bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL })).to.not.be.revert(ethers);
+    const { bgamble, alice } = await deployFixture();
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A);
     const bet = await bgamble.bets(1);
     expect(bet.bgaTableId).to.equal(BGA_TABLE_ID);
   });
 
   it("should store realistic BGA player IDs as predictedWinner", async function () {
     const { bgamble, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, BGA_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A);
+    await bgamble.connect(bob).join(1, BGA_PLAYER_B);
     const participants = await bgamble.getParticipants(1);
     expect(participants[0].predictedWinner).to.equal(BGA_PLAYER_A);
     expect(participants[1].predictedWinner).to.equal(BGA_PLAYER_B);
@@ -32,19 +32,19 @@ describe("big BGA IDs (uint64)", function () {
 
   it("should emit BetCreated with realistic BGA IDs", async function () {
     const { bgamble, alice } = await deployFixture();
-    await expect(bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL }))
+    await expect(bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A))
       .to.emit(bgamble, "BetCreated")
-      .withArgs(1, BGA_TABLE_ID, () => true, alice.address, TEN_POL, 2, BGA_PLAYER_A);
+      .withArgs(1, BGA_TABLE_ID, () => true, alice.address, TEN_USDT, 2, BGA_PLAYER_A);
   });
 
   it("should resolve correctly with realistic BGA player IDs as winners", async function () {
-    const { bgamble, ethers, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, BGA_PLAYER_B, { value: TEN_POL * POL });
+    const { bgamble, usdt, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A);
+    await bgamble.connect(bob).join(1, BGA_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 
-    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const aliceBefore = await usdt.balanceOf(alice.address);
 
     await bgamble.connect(oracle1).reportResult(1, [BGA_PLAYER_A]);
     await bgamble.connect(oracle2).reportResult(1, [BGA_PLAYER_A]);
@@ -53,15 +53,15 @@ describe("big BGA IDs (uint64)", function () {
     const bet = await bgamble.bets(1);
     expect(bet.state).to.equal(3); // Resolved
 
-    const prizePool = TEN_POL * POL * 2n;
-    const aliceAfter = await ethers.provider.getBalance(alice.address);
-    expect(aliceAfter - aliceBefore).to.equal(prizePool - oracleFee(prizePool));
+    const prizePool = TEN_USDT * USDT_UNIT * 2n;
+    const aliceAfter = await usdt.balanceOf(alice.address);
+    expect(aliceAfter - aliceBefore).to.equal(prizePool - ORACLE_FEE);
   });
 
   it("should store realistic resolvedWinnerIds", async function () {
     const { bgamble, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, BGA_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A);
+    await bgamble.connect(bob).join(1, BGA_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 
@@ -76,8 +76,8 @@ describe("big BGA IDs (uint64)", function () {
 
   it("should return realistic IDs in getBetSummary", async function () {
     const { bgamble, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, BGA_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A);
+    await bgamble.connect(bob).join(1, BGA_PLAYER_B);
 
     const summary = await bgamble.getBetSummary(1);
     expect(summary.bgaTableId).to.equal(BGA_TABLE_ID);
@@ -87,8 +87,8 @@ describe("big BGA IDs (uint64)", function () {
 
   it("should compute correct oracle result hash for realistic IDs", async function () {
     const { bgamble, ethers, oracle1, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 2, BGA_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, BGA_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 2, BGA_PLAYER_A);
+    await bgamble.connect(bob).join(1, BGA_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 
@@ -104,37 +104,37 @@ describe("big BGA IDs (uint64)", function () {
   // ── IDs exceeding uint32 max ────────────────────────────────────
 
   it("should handle table IDs exceeding uint32 max", async function () {
-    const { bgamble, alice, ethers } = await deployFixture();
-    await expect(bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_POL, 2, LARGE_PLAYER_A, { value: TEN_POL * POL })).to.not.be.revert(ethers);
+    const { bgamble, alice } = await deployFixture();
+    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_USDT, 2, LARGE_PLAYER_A);
     const bet = await bgamble.bets(1);
     expect(bet.bgaTableId).to.equal(LARGE_TABLE_ID);
   });
 
   it("should handle player IDs exceeding uint32 max", async function () {
     const { bgamble, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_POL, 2, LARGE_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, LARGE_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_USDT, 2, LARGE_PLAYER_A);
+    await bgamble.connect(bob).join(1, LARGE_PLAYER_B);
     const participants = await bgamble.getParticipants(1);
     expect(participants[0].predictedWinner).to.equal(LARGE_PLAYER_A);
     expect(participants[1].predictedWinner).to.equal(LARGE_PLAYER_B);
   });
 
   it("should resolve correctly with winner IDs exceeding uint32 max", async function () {
-    const { bgamble, ethers, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_POL, 2, LARGE_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, LARGE_PLAYER_B, { value: TEN_POL * POL });
+    const { bgamble, usdt, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
+    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_USDT, 2, LARGE_PLAYER_A);
+    await bgamble.connect(bob).join(1, LARGE_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 
-    const aliceBefore = await ethers.provider.getBalance(alice.address);
+    const aliceBefore = await usdt.balanceOf(alice.address);
 
     await bgamble.connect(oracle1).reportResult(1, [LARGE_PLAYER_A]);
     await bgamble.connect(oracle2).reportResult(1, [LARGE_PLAYER_A]);
     await bgamble.connect(oracle3).reportResult(1, [LARGE_PLAYER_A]);
 
-    const prizePool = TEN_POL * POL * 2n;
-    const aliceAfter = await ethers.provider.getBalance(alice.address);
-    expect(aliceAfter - aliceBefore).to.equal(prizePool - oracleFee(prizePool));
+    const prizePool = TEN_USDT * USDT_UNIT * 2n;
+    const aliceAfter = await usdt.balanceOf(alice.address);
+    expect(aliceAfter - aliceBefore).to.equal(prizePool - ORACLE_FEE);
 
     const resolved = await bgamble.getResolvedWinnerIds(1);
     expect(resolved[0]).to.equal(LARGE_PLAYER_A);
@@ -142,8 +142,8 @@ describe("big BGA IDs (uint64)", function () {
 
   it("should match oracle consensus on large winner IDs", async function () {
     const { bgamble, ethers, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_POL, 2, LARGE_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, LARGE_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_USDT, 2, LARGE_PLAYER_A);
+    await bgamble.connect(bob).join(1, LARGE_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 
@@ -169,29 +169,29 @@ describe("big BGA IDs (uint64)", function () {
   });
 
   it("should split payout among multiple winners with large IDs (3 players)", async function () {
-    const { bgamble, ethers, oracle1, oracle2, oracle3, alice, bob, carol } = await deployFixture();
-    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_POL, 3, BGA_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, BGA_PLAYER_B, { value: TEN_POL * POL });
-    await bgamble.connect(carol).join(1, BGA_PLAYER_C, { value: TEN_POL * POL });
+    const { bgamble, usdt, oracle1, oracle2, oracle3, alice, bob, carol } = await deployFixture();
+    await bgamble.connect(alice).create(BGA_TABLE_ID, TEN_USDT, 3, BGA_PLAYER_A);
+    await bgamble.connect(bob).join(1, BGA_PLAYER_B);
+    await bgamble.connect(carol).join(1, BGA_PLAYER_C);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
     await bgamble.connect(carol).confirm(1);
 
-    const aliceBefore = await ethers.provider.getBalance(alice.address);
-    const bobBefore = await ethers.provider.getBalance(bob.address);
+    const aliceBefore = await usdt.balanceOf(alice.address);
+    const bobBefore = await usdt.balanceOf(bob.address);
 
     const winners = [BGA_PLAYER_A, BGA_PLAYER_B];
     await bgamble.connect(oracle1).reportResult(1, winners);
     await bgamble.connect(oracle2).reportResult(1, winners);
     await bgamble.connect(oracle3).reportResult(1, winners);
 
-    const prizePool = TEN_POL * POL * 3n;
-    const payout = prizePool - oracleFee(prizePool);
+    const prizePool = TEN_USDT * USDT_UNIT * 3n;
+    const payout = prizePool - ORACLE_FEE;
     const share = payout / 2n;
     const remainder = payout % 2n;
 
-    expect(await ethers.provider.getBalance(alice.address) - aliceBefore).to.equal(share);
-    expect(await ethers.provider.getBalance(bob.address) - bobBefore).to.equal(share + remainder);
+    expect(await usdt.balanceOf(alice.address) - aliceBefore).to.equal(share);
+    expect(await usdt.balanceOf(bob.address) - bobBefore).to.equal(share + remainder);
 
     const resolved = await bgamble.getResolvedWinnerIds(1);
     expect(resolved.length).to.equal(2);
@@ -200,9 +200,9 @@ describe("big BGA IDs (uint64)", function () {
   });
 
   it("should leave contract with 0 balance after resolution with large IDs", async function () {
-    const { bgamble, ethers, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_POL, 2, LARGE_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, LARGE_PLAYER_B, { value: TEN_POL * POL });
+    const { bgamble, usdt, oracle1, oracle2, oracle3, alice, bob } = await deployFixture();
+    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_USDT, 2, LARGE_PLAYER_A);
+    await bgamble.connect(bob).join(1, LARGE_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 
@@ -210,13 +210,13 @@ describe("big BGA IDs (uint64)", function () {
     await bgamble.connect(oracle2).reportResult(1, [LARGE_PLAYER_A]);
     await bgamble.connect(oracle3).reportResult(1, [LARGE_PLAYER_A]);
 
-    expect(await ethers.provider.getBalance(await bgamble.getAddress())).to.equal(0);
+    expect(await usdt.balanceOf(await bgamble.getAddress())).to.equal(0);
   });
 
   it("should emit OracleReported event with large winner IDs", async function () {
     const { bgamble, ethers, oracle1, alice, bob } = await deployFixture();
-    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_POL, 2, LARGE_PLAYER_A, { value: TEN_POL * POL });
-    await bgamble.connect(bob).join(1, LARGE_PLAYER_B, { value: TEN_POL * POL });
+    await bgamble.connect(alice).create(LARGE_TABLE_ID, TEN_USDT, 2, LARGE_PLAYER_A);
+    await bgamble.connect(bob).join(1, LARGE_PLAYER_B);
     await bgamble.connect(alice).confirm(1);
     await bgamble.connect(bob).confirm(1);
 

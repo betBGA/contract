@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import { expect } from "chai";
-import { deployFixture, createOpenBetFixture, confirmingBetFixture, lockedBetFixture, lockedBet3PlayersFixture, TEN_POL, POL, ONE_DAY } from "./helpers.js";
+import { deployFixture, createOpenBetFixture, confirmingBetFixture, lockedBetFixture, lockedBet3PlayersFixture, TEN_USDT, ONE_DAY } from "./helpers.js";
 
 describe("view functions", function () {
   // ── getParticipants ─────────────────────────────────────────────
@@ -23,9 +23,9 @@ describe("view functions", function () {
     });
 
     it("should return 2 participants after join", async function () {
-      const { bgamble, alice, bob, ethers } = await createOpenBetFixture();
+      const { bgamble, alice, bob } = await createOpenBetFixture();
       const winnerB = 2;
-      await bgamble.connect(bob).join(1, winnerB, { value: TEN_POL * POL });
+      await bgamble.connect(bob).join(1, winnerB);
       const participants = await bgamble.getParticipants(1);
       expect(participants.length).to.equal(2);
       expect(participants[0].addr).to.equal(alice.address);
@@ -33,9 +33,9 @@ describe("view functions", function () {
     });
 
     it("should reflect confirmation status", async function () {
-      const { bgamble, alice, bob, ethers } = await createOpenBetFixture();
+      const { bgamble, alice, bob } = await createOpenBetFixture();
       const winnerB = 2;
-      await bgamble.connect(bob).join(1, winnerB, { value: TEN_POL * POL });
+      await bgamble.connect(bob).join(1, winnerB);
       await bgamble.connect(alice).confirm(1);
 
       const participants = await bgamble.getParticipants(1);
@@ -53,9 +53,9 @@ describe("view functions", function () {
     });
 
     it("should return correct array after a participant leaves", async function () {
-      const { bgamble, alice, bob, ethers } = await deployFixture();
-      await bgamble.connect(alice).create(1, TEN_POL, 3, 1, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, 2, { value: TEN_POL * POL });
+      const { bgamble, alice, bob } = await deployFixture();
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, 1);
+      await bgamble.connect(bob).join(1, 2);
       await bgamble.connect(alice).leave(1);
 
       const participants = await bgamble.getParticipants(1);
@@ -259,7 +259,7 @@ describe("view functions", function () {
       expect(s.confirmCount).to.equal(0);
       expect(s.cancelVoteCount).to.equal(0);
       expect(s.state).to.equal(0); // Open
-      expect(s.amount).to.equal(TEN_POL);
+      expect(s.amount).to.equal(TEN_USDT);
       expect(s.lockedAt).to.equal(0);
       expect(s.createdAtBlock).to.be.greaterThan(0);
       expect(s.participants.length).to.equal(1);
@@ -301,9 +301,9 @@ describe("view functions", function () {
     it("should return Open bets (descending)", async function () {
       const { bgamble, alice } = await deployFixture();
       const w = 1;
-      await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, w, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(2, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, w);
 
       const results = await bgamble.getBetsByState(0, 0, 20, false);
       expect(results.length).to.equal(3);
@@ -315,9 +315,9 @@ describe("view functions", function () {
     it("should return Open bets (ascending)", async function () {
       const { bgamble, alice } = await deployFixture();
       const w = 1;
-      await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, w, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(2, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, w);
 
       const results = await bgamble.getBetsByState(0, 0, 20, true);
       expect(results.length).to.equal(3);
@@ -331,10 +331,10 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 3, wA, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(2, wB, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, wA, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, wA);
+      await bgamble.connect(alice).create(2, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(2, wB);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, wA);
 
       const openBets = await bgamble.getBetsByState(0, 0, 20, false);
       expect(openBets.length).to.equal(2);
@@ -349,9 +349,9 @@ describe("view functions", function () {
     it("should respect the limit parameter", async function () {
       const { bgamble, alice } = await deployFixture();
       const w = 1;
-      await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, w, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(2, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, w);
 
       const results = await bgamble.getBetsByState(0, 0, 2, false);
       expect(results.length).to.equal(2);
@@ -362,11 +362,11 @@ describe("view functions", function () {
     it("should paginate with cursor (descending)", async function () {
       const { bgamble, alice } = await deployFixture();
       const w = 1;
-      await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(4, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(5, TEN_POL, 3, w, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(2, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(4, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(5, TEN_USDT, 3, w);
 
       const page1 = await bgamble.getBetsByState(0, 0, 2, false);
       expect(page1.length).to.equal(2);
@@ -389,9 +389,9 @@ describe("view functions", function () {
     it("should paginate with cursor (ascending)", async function () {
       const { bgamble, alice } = await deployFixture();
       const w = 1;
-      await bgamble.connect(alice).create(1, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 3, w, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, w, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(2, TEN_USDT, 3, w);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, w);
 
       const page1 = await bgamble.getBetsByState(0, 0, 2, true);
       expect(page1.length).to.equal(2);
@@ -411,11 +411,11 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 3, wA, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(2, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(2, wB, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(3, TEN_POL, 3, wA, { value: TEN_POL * POL });
-      await bgamble.connect(alice).create(4, TEN_POL, 3, wA, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 3, wA);
+      await bgamble.connect(alice).create(2, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(2, wB);
+      await bgamble.connect(alice).create(3, TEN_USDT, 3, wA);
+      await bgamble.connect(alice).create(4, TEN_USDT, 3, wA);
 
       const page1 = await bgamble.getBetsByState(0, 0, 2, false);
       expect(page1.length).to.equal(2);
@@ -432,12 +432,12 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, wB, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(1, wB);
       await bgamble.connect(alice).confirm(1);
       await bgamble.connect(bob).confirm(1);
 
-      await bgamble.connect(alice).create(2, TEN_POL, 3, wA, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(2, TEN_USDT, 3, wA);
 
       const locked = await bgamble.getBetsByState(2, 0, 20, false);
       expect(locked.length).to.equal(1);
@@ -451,8 +451,8 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, wB, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(1, wB);
       await bgamble.connect(alice).confirm(1);
       await bgamble.connect(bob).confirm(1);
 
@@ -471,8 +471,8 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, wB, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(1, wB);
       await bgamble.connect(alice).confirm(1);
       await bgamble.connect(bob).confirm(1);
 
@@ -492,8 +492,8 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, wB, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(1, wB);
       await bgamble.connect(alice).confirm(1);
       await bgamble.connect(bob).confirm(1);
       await bgamble.connect(alice).voteCancel(1);
@@ -510,8 +510,8 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, wB, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(1, wB);
       await bgamble.connect(alice).confirm(1);
       await bgamble.connect(bob).confirm(1);
 
@@ -529,8 +529,8 @@ describe("view functions", function () {
       const wA = 1;
       const wB = 2;
 
-      await bgamble.connect(alice).create(1, TEN_POL, 2, wA, { value: TEN_POL * POL });
-      await bgamble.connect(bob).join(1, wB, { value: TEN_POL * POL });
+      await bgamble.connect(alice).create(1, TEN_USDT, 2, wA);
+      await bgamble.connect(bob).join(1, wB);
 
       const results = await bgamble.getBetsByState(1, 0, 20, false);
       expect(results.length).to.equal(1);

@@ -1,11 +1,10 @@
-    console.error("Usage: hardhat run scripts/setAcceptingNewBets.js --network <network> -- <true|false>");
 import hre from "hardhat";
 
 async function main() {
   const contractAddress = process.env.BGAMBLE_ADDRESS;
   if (!contractAddress) throw new Error("Set BGAMBLE_ADDRESS in your .env file");
-  const arg = process.env.ACCEPTING;
-  const arg = process.argv.at(-1);
+  const arg = process.env.ACCEPTING ?? process.argv.at(-1);
+  if (arg !== "true" && arg !== "false") {
     console.error("Usage: ACCEPTING=<true|false> hardhat run scripts/setAcceptingNewBets.js --network <network>");
     console.error("Usage: hardhat run scripts/setAcceptingNewBets.js --network <network> -- <true|false>");
     process.exitCode = 1;

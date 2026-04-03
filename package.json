@@ -12,9 +12,6 @@
     "halt:mainnet": "ACCEPTING=false hardhat run scripts/setAcceptingNewBets.js --network polygon",
     "resume:testnet": "ACCEPTING=true hardhat run scripts/setAcceptingNewBets.js --network amoy",
     "resume:mainnet": "ACCEPTING=true hardhat run scripts/setAcceptingNewBets.js --network polygon"
-    "halt:mainnet": "hardhat run scripts/setAcceptingNewBets.js --network polygon -- false",
-    "resume:testnet": "hardhat run scripts/setAcceptingNewBets.js --network amoy -- true",
-    "resume:mainnet": "hardhat run scripts/setAcceptingNewBets.js --network polygon -- true"
   },
   "keywords": [],
   "author": "",

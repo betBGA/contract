@@ -31,6 +31,9 @@ ORACLE_2=0x...
 ORACLE_3=0x...
 ORACLE_4=0x...
 
+# USDT token contract address for the target network
+USDT_ADDRESS=0x...
+
 # Deployed contract address (needed for halt/resume scripts)
 BGAMBLE_ADDRESS=0x...
 
@@ -46,7 +49,7 @@ npm run deploy:testnet
 
 This runs `hardhat run scripts/deploy.js --network amoy`, which will:
 1. Compile the contract
-2. Deploy it to Amoy
+2. Deploy it to Amoy using the constructor arguments `[oracle1, oracle2, oracle3, oracle4]` and `USDT_ADDRESS`
 3. Wait 30 seconds, then attempt to verify it on Polygonscan
 
 The deployer wallet becomes the **contract owner** — the only address that can call `setAcceptingNewBets()` to halt or resume new bet creation. This is stored as an immutable value and cannot be transferred, so make sure to use the correct wallet.
@@ -56,6 +59,7 @@ You'll see output like:
 Deploying BGAmble...
   Network : amoy
   Oracles : 0x... 0x... 0x... 0x...
+  USDT    : 0x...
 
 ✅ BGAmble deployed to: 0xYOUR_CONTRACT_ADDRESS
 ```
@@ -76,6 +80,9 @@ ORACLE_1=0x...
 ORACLE_2=0x...
 ORACLE_3=0x...
 ORACLE_4=0x...
+
+# USDT token contract address on Polygon mainnet
+USDT_ADDRESS=0x...
 ```
 
 ### 3. Deploy
@@ -97,7 +104,8 @@ If auto-verification fails, you can retry manually:
 
 ```bash
 npx hardhat verify --network amoy CONTRACT_ADDRESS \
-  "[0xORACLE1,0xORACLE2,0xORACLE3,0xORACLE4]"
+  "[0xORACLE1,0xORACLE2,0xORACLE3,0xORACLE4]" \
+  "0xUSDT_ADDRESS"
 ```
 
 ---
