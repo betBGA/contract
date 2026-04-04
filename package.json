@@ -6,12 +6,12 @@
   "scripts": {
     "build": "hardhat build",
     "test": "hardhat test",
-    "deploy:testnet": "hardhat run scripts/deploy.js --network amoy",
-    "deploy:mainnet": "hardhat run scripts/deploy.js --network polygon",
-    "halt:testnet": "ACCEPTING=false hardhat run scripts/setAcceptingNewBets.js --network amoy",
-    "halt:mainnet": "ACCEPTING=false hardhat run scripts/setAcceptingNewBets.js --network polygon",
-    "resume:testnet": "ACCEPTING=true hardhat run scripts/setAcceptingNewBets.js --network amoy",
-    "resume:mainnet": "ACCEPTING=true hardhat run scripts/setAcceptingNewBets.js --network polygon"
+    "deploy:testnet": "DOTENV_CONFIG_PATH=.env.testnet hardhat run scripts/deploy.js --network amoy",
+    "deploy:mainnet": "DOTENV_CONFIG_PATH=.env.mainnet hardhat run scripts/deploy.js --network polygon",
+    "halt:testnet": "DOTENV_CONFIG_PATH=.env.testnet ACCEPTING=false hardhat run scripts/setAcceptingNewBets.js --network amoy",
+    "halt:mainnet": "DOTENV_CONFIG_PATH=.env.mainnet ACCEPTING=false hardhat run scripts/setAcceptingNewBets.js --network polygon",
+    "resume:testnet": "DOTENV_CONFIG_PATH=.env.testnet ACCEPTING=true hardhat run scripts/setAcceptingNewBets.js --network amoy",
+    "resume:mainnet": "DOTENV_CONFIG_PATH=.env.mainnet ACCEPTING=true hardhat run scripts/setAcceptingNewBets.js --network polygon"
   },
   "keywords": [],
   "author": "",

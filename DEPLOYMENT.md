@@ -13,13 +13,13 @@ Use MetaMask or any wallet to create a **dedicated deployer wallet**. Export its
 You need testnet POL to pay for gas on Amoy:
 - Go to the [Polygon Amoy Faucet](https://faucet.polygon.technology/) and request test POL for your deployer address.
 
-### 3. Fill in your `.env` file
+### 3. Fill in your `.env.testnet` file
 
 ```bash
-cp .env.example .env
+cp .env.example .env.testnet
 ```
 
-Then edit `.env`:
+Then edit `.env.testnet`:
 
 ```env
 # Private key of your deployer wallet (with or without 0x prefix)
@@ -72,10 +72,19 @@ Deploying BGAmble...
 
 Buy POL and send it to your deployer wallet address. A few dollars worth is enough for deployment gas.
 
-### 2. Update `.env` for mainnet
+### 2. Create your `.env.mainnet` file
+
+```bash
+cp .env.example .env.mainnet
+```
+
+Then edit `.env.mainnet`:
 
 ```env
-# Use your real oracle addresses (can be the same or different)
+# Private key of your deployer wallet (with or without 0x prefix)
+DEPLOYER_PRIVATE_KEY=your_private_key_here
+
+# Use your real oracle addresses (can be the same or different from testnet)
 ORACLE_1=0x...
 ORACLE_2=0x...
 ORACLE_3=0x...
@@ -83,6 +92,9 @@ ORACLE_4=0x...
 
 # USDT token contract address on Polygon mainnet
 USDT_ADDRESS=0x...
+
+# Optional: for contract verification on Polygonscan
+POLYGONSCAN_API_KEY=your_key_here
 ```
 
 ### 3. Deploy
@@ -112,7 +124,7 @@ npx hardhat verify --network amoy CONTRACT_ADDRESS \
 
 ## Halt / Resume New Bet Creation
 
-After deployment, set `BGAMBLE_ADDRESS` in your `.env` to the deployed contract address, then use the convenience scripts to halt or resume new bet creation. The scripts use the `DEPLOYER_PRIVATE_KEY` from `.env` to sign the transaction.
+After deployment, set `BGAMBLE_ADDRESS` in the appropriate env file (`.env.testnet` or `.env.mainnet`) to the deployed contract address, then use the convenience scripts to halt or resume new bet creation. The scripts use the `DEPLOYER_PRIVATE_KEY` from the same env file to sign the transaction.
 
 ```bash
 # Stop new bets from being created
